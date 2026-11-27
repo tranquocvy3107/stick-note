@@ -59,6 +59,6 @@ The first release.
 - Automatic saving into the `data/` folder (JSON file and images), a backup every day, automatic recovery from a damaged file, merging when several windows are open, and unsaved notes kept in the window if the server stops unexpectedly.
 - Opens as its own app window with `start.bat`, a script that creates a desktop shortcut, and a background server that quits by itself when the window is closed.
 
-[1.2.0]: https://github.com/tranquocvy3107/stick-note/releases/tag/v1.2.0
-[1.1.0]: https://github.com/tranquocvy3107/stick-note/releases/tag/v1.1.0
-[1.0.0]: https://github.com/tranquocvy3107/stick-note/releases/tag/v1.0.0
+[1.2.0]: https://github.com/vytk712025main-eng/stick-note/releases/tag/v1.2.0
+[1.1.0]: https://github.com/vytk712025main-eng/stick-note/releases/tag/v1.1.0
+[1.0.0]: https://github.com/vytk712025main-eng/stick-note/releases/tag/v1.0.0

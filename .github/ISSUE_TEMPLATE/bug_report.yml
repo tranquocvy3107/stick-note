@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         Thanks for taking the time to report this. Please fill in what you can.
-        **Do not paste private notes or personal data.** For a security problem, do not use this form: see [SECURITY.md](https://github.com/tranquocvy3107/stick-note/blob/main/SECURITY.md).
+        **Do not paste private notes or personal data.** For a security problem, do not use this form: see [SECURITY.md](https://github.com/vytk712025main-eng/stick-note/blob/main/SECURITY.md).
   - type: textarea
     id: what-happened
     attributes:

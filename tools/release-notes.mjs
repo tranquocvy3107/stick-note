@@ -33,7 +33,7 @@ console.log(`${body}
 | Windows without installing | \`${n.windowsPortable}\`: unzip anywhere and run \`Stick Note.exe\` |
 | Linux without installing | \`${n.linuxTarball}\`: extract anywhere and run \`stick-note\` |
 
-Node.js is **not** needed: it is included. Step-by-step help is in the [README](https://github.com/tranquocvy3107/stick-note#install).
+Node.js is **not** needed: it is included. Step-by-step help is in the [README](https://github.com/vytk712025main-eng/stick-note#install).
 
 **Windows may say "Windows protected your PC"** because this app is new and not code-signed yet. Click **More info**, then **Run anyway**. You can check the download first with \`${n.checksums}\`.
 

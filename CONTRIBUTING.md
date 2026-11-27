@@ -20,7 +20,7 @@ If your idea bends one of these, open an issue first so we can talk it through b
 You need [Node.js](https://nodejs.org) 20.11 or newer and a Chromium-based browser (Edge, Chrome, Chromium, Brave).
 
 ```bash
-git clone https://github.com/tranquocvy3107/stick-note.git
+git clone https://github.com/vytk712025main-eng/stick-note.git
 cd stick-note
 npm test                                  # all tests, no install step
 node server.js                            # run in the foreground and watch the log
@@ -93,7 +93,7 @@ Anything missing falls back to English, so a partial translation still works.
 
 ## Reporting bugs and ideas
 
-Use the [issue templates](https://github.com/tranquocvy3107/stick-note/issues/new/choose). For security problems, follow [SECURITY.md](SECURITY.md) instead of opening a public issue.
+Use the [issue templates](https://github.com/vytk712025main-eng/stick-note/issues/new/choose). For security problems, follow [SECURITY.md](SECURITY.md) instead of opening a public issue.
 
 ## Releases (maintainers)
 

@@ -6,7 +6,7 @@ Stick Note keeps personal notes, so we take security reports seriously.
 
 Please **do not open a public issue** for a security problem. Use GitHub's private reporting instead:
 
-1. Open the [Security tab](https://github.com/tranquocvy3107/stick-note/security) of this repository.
+1. Open the [Security tab](https://github.com/vytk712025main-eng/stick-note/security) of this repository.
 2. Click **Report a vulnerability** and describe the problem: what you did, what happened, and which version and operating system.
 
 You will get a first answer within about a week. This is a volunteer project, so fixes take the time they take, but we will keep you informed and credit you in the release notes if you wish.

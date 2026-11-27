@@ -32,7 +32,7 @@
   #define Copyright ""
 #endif
 #ifndef AppUrl
-  #define AppUrl "https://github.com/tranquocvy3107/stick-note"
+  #define AppUrl "https://github.com/vytk712025main-eng/stick-note"
 #endif
 
 #define AppName "Stick Note"

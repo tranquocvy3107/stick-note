@@ -9,8 +9,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tranquocvy3107/stick-note/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/tranquocvy3107/stick-note"></a>
-  <a href="https://github.com/tranquocvy3107/stick-note/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/tranquocvy3107/stick-note/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/vytk712025main-eng/stick-note/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/tranquocvy3107/stick-note"></a>
+  <a href="https://github.com/vytk712025main-eng/stick-note/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/vytk712025main-eng/stick-note/actions/workflows/ci.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green"></a>
 </p>
 
@@ -26,7 +26,7 @@ Stick Note is a private notes app with **one screen**: a big, endless whiteboard
 
 ## Install
 
-Download **one file** from the [latest release](https://github.com/tranquocvy3107/stick-note/releases/latest) and double-click it. You do **not** need Node.js, a terminal or an account.
+Download **one file** from the [latest release](https://github.com/vytk712025main-eng/stick-note/releases/latest) and double-click it. You do **not** need Node.js, a terminal or an account.
 
 | Your computer | Download | Then |
 |---|---|---|
@@ -105,14 +105,14 @@ Press `?` inside the app for the full list. Quit with Menu, **Quit Stick Note** 
 | I deleted too much | Press `Ctrl+Z` right away. Otherwise open the trash, or copy a file from `backups/` over `board.json` (quit Stick Note first). |
 | I want to see what the server is doing | Read `server.log` in the data folder. |
 
-Still stuck? [Open an issue](https://github.com/tranquocvy3107/stick-note/issues/new/choose); it helps a lot if you say which system and which Stick Note version you use (shown in the file name you downloaded).
+Still stuck? [Open an issue](https://github.com/vytk712025main-eng/stick-note/issues/new/choose); it helps a lot if you say which system and which Stick Note version you use (shown in the file name you downloaded).
 
 ## For developers
 
 Stick Note is a zero-dependency Node.js server (`server.js`, `src/`) plus a vanilla JavaScript interface (`public/`), with no build step.
 
 ```bash
-git clone https://github.com/tranquocvy3107/stick-note.git
+git clone https://github.com/vytk712025main-eng/stick-note.git
 cd stick-note
 npm test                # needs Node.js 20.11 or newer
 node server.js --open   # start it and open the app window (also: ./start.sh, start.bat)

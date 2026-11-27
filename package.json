@@ -6,11 +6,11 @@
   "author": "tranquocvy3107",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tranquocvy3107/stick-note.git"
+    "url": "git+https://github.com/vytk712025main-eng/stick-note.git"
   },
-  "homepage": "https://github.com/tranquocvy3107/stick-note#readme",
+  "homepage": "https://github.com/vytk712025main-eng/stick-note#readme",
   "bugs": {
-    "url": "https://github.com/tranquocvy3107/stick-note/issues"
+    "url": "https://github.com/vytk712025main-eng/stick-note/issues"
   },
   "keywords": ["whiteboard", "sticky-notes", "notes", "local-first", "offline", "windows", "linux"],
   "description": "A personal whiteboard of sticky notes: drag a slip onto the board, write text, a link or an image, and leave it where it is.",
