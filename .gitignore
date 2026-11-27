@@ -1,0 +1,7 @@
+# Dữ liệu cá nhân của người dùng: không bao giờ commit
+data/
+
+node_modules/
+*.log
+.DS_Store
+Thumbs.db

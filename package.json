@@ -1,0 +1,26 @@
+{
+  "name": "stick-note",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "author": "tranquocvy3107",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tranquocvy3107/stick-note.git"
+  },
+  "homepage": "https://github.com/tranquocvy3107/stick-note#readme",
+  "bugs": {
+    "url": "https://github.com/tranquocvy3107/stick-note/issues"
+  },
+  "keywords": ["whiteboard", "sticky-notes", "notes", "local-first", "windows"],
+  "description": "Whiteboard giấy nhớ cá nhân: kéo mảnh giấy vào bảng, ghi chữ, link, ảnh rồi để nguyên đó.",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "start": "node server.js --open",
+    "serve": "node server.js",
+    "test": "node --test"
+  }
+}

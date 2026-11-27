@@ -1,0 +1,52 @@
+name: Release
+
+# Phát hành tự động: đẩy một tag dạng vX.Y.Z lên GitHub là có bản phát hành mới.
+#   git tag v1.0.1
+#   git push origin v1.0.1
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Đóng gói và phát hành
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Kiểm tra tag khớp với phiên bản trong package.json
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          PKG="$(jq -r .version package.json)"
+          if [ "$VERSION" != "$PKG" ]; then
+            echo "Tag $GITHUB_REF_NAME không khớp version trong package.json ($PKG)."
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - run: npm test
+
+      - name: Đóng gói
+        run: |
+          mkdir dist
+          git archive --format=zip --prefix="stick-note-${VERSION}/" -o "dist/stick-note-${VERSION}.zip" "$GITHUB_REF_NAME"
+          (cd dist && sha256sum "stick-note-${VERSION}.zip" > "stick-note-${VERSION}.zip.sha256")
+          node tools/release-notes.mjs "$VERSION" > dist/notes.md
+
+      - name: Tạo bản phát hành trên GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "dist/stick-note-${VERSION}.zip" \
+            "dist/stick-note-${VERSION}.zip.sha256" \
+            --title "Stick Note ${VERSION}" \
+            --notes-file dist/notes.md \
+            --verify-tag
