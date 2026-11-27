@@ -1,7 +1,8 @@
-// Xử lý ảnh ở phía trình duyệt: đọc kích thước, tạo ảnh thu nhỏ, đổi sang PNG, rồi tải lên máy chủ.
-// Ảnh gốc được giữ nguyên (không nén lại). Ảnh thu nhỏ chỉ dùng để bảng nhẹ khi có nhiều ảnh.
+// Image handling in the browser: read the size, make a thumbnail, convert to PNG, then upload to the server.
+// The original is stored untouched (never re-compressed). Thumbnails only keep the board light when it holds many images.
 
 import { api } from './api.js';
+import { t } from './i18n.js';
 
 const SERVER_FORMATS = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 const THUMB_LONG_SIDE = 900;
@@ -19,7 +20,7 @@ function canvasToBlob(source, type, quality, w, h) {
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(source, 0, 0, w, h);
   return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('không mã hóa được ảnh'))), type, quality);
+    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error(t('image.encodeFailed')))), type, quality);
   });
 }
 
@@ -32,14 +33,14 @@ export async function toPngBlob(blob) {
   }
 }
 
-// Tải ảnh lên máy chủ. Trả về { img, th, iw, ih } để tạo mảnh giấy ảnh.
+// Upload an image to the server. Returns { img, th, iw, ih } for building an image note.
 export async function storeImage(file) {
-  if (file.size > MAX_BYTES) throw new Error('ảnh lớn hơn 25 MB');
+  if (file.size > MAX_BYTES) throw new Error(t('image.tooBig'));
   let bitmap;
   try {
     bitmap = await createImageBitmap(file);
   } catch {
-    throw new Error('không đọc được ảnh này');
+    throw new Error(t('image.unreadable'));
   }
   try {
     const iw = bitmap.width;

@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=Stick Note
+GenericName=Whiteboard
+Comment=A personal whiteboard of sticky notes
+Exec=stick-note
+Icon=stick-note
+Terminal=false
+# One main category only (Office); two would list the app twice in some menus.
+Categories=Office;
+Keywords=notes;sticky;whiteboard;memo;
+# The launcher hands over to a browser window and exits, so there is nothing to wait for:
+# StartupNotify=true would leave a busy cursor spinning until the desktop gives up.
+StartupNotify=false

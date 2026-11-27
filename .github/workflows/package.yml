@@ -1,0 +1,97 @@
+name: Package
+
+# Builds the Windows and Linux packages, smoke-tests every one of them and uploads them as artifacts.
+# Called by ci.yml (every push to main and every pull request) and by release.yml (every version tag).
+# It can also be started by hand from the Actions tab. How to build the same files locally:
+# tools/package/README.md
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows (installer and portable zip)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+
+      - name: Install Inno Setup (only when the runner image does not have it)
+        shell: pwsh
+        run: |
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (Test-Path -LiteralPath $iscc) {
+            Write-Host "Inno Setup is already installed: $iscc"
+          } else {
+            choco install innosetup -y --no-progress
+            if ($LASTEXITCODE -ne 0) { throw "Installing Inno Setup failed (exit code $LASTEXITCODE)" }
+          }
+
+      - name: Build the installer and the portable zip
+        run: node tools/package/build-windows.mjs
+
+      # Installs into temporary folders, upgrades over a running copy, uninstalls. The clean runner has no
+      # "Stick Note" shortcut of its own, so the Desktop shortcut can be tested too.
+      - name: Smoke-test them
+        run: node tools/package/smoke-windows.mjs --desktop-shortcut
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: packages-windows
+          path: |
+            dist/*.exe
+            dist/*.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  linux:
+    name: Linux (.deb, AppImage and tar.gz)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # The .deb needs a maintainer address. The GitHub "noreply" form of the repository owner keeps
+      # any private address out of a public file.
+      STICK_NOTE_MAINTAINER_EMAIL: ${{ github.repository_owner_id }}+${{ github.repository_owner }}@users.noreply.github.com
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+
+      - name: Install lintian (checks the .deb) and desktop-file-utils (checks the menu entry)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends lintian desktop-file-utils
+
+      - name: Build the .deb, the AppImage and the tar.gz
+        run: node tools/package/build-linux.mjs
+
+      # Installs the .deb with dpkg (the runner user has passwordless sudo), upgrades it over a running
+      # copy and removes it again; --fuse also starts the AppImage the way a person does, mounted by FUSE.
+      - name: Smoke-test them
+        run: node tools/package/smoke-linux.mjs --require-lintian --fuse
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: packages-linux
+          path: |
+            dist/*.deb
+            dist/*.AppImage
+            dist/*.tar.gz
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14

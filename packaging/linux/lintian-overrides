@@ -1,0 +1,8 @@
+# Stick Note is a self-contained application: it carries its own copy of the official Node.js
+# runtime, unmodified, and installs under /opt like other third-party desktop applications do.
+stick-note: dir-or-file-in-opt [opt/stick-note/*]
+stick-note: embedded-library zlib [opt/stick-note/runtime/node]
+stick-note: unstripped-binary-or-object [opt/stick-note/runtime/node]
+stick-note: hardening-no-pie [opt/stick-note/runtime/node]
+# server.js is always started through the bundled runtime ("node server.js"), never run directly.
+stick-note: script-not-executable [opt/stick-note/app/server.js]

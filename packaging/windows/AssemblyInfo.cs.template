@@ -1,0 +1,12 @@
+// Version information of Stick Note.exe. Generated at build time from package.json by
+// tools/package/build-windows.mjs (csc turns these attributes into the Windows version resource).
+using System.Reflection;
+
+[assembly: AssemblyTitle("Stick Note")]
+[assembly: AssemblyDescription("Stick Note launcher")]
+[assembly: AssemblyCompany("Stick Note")]
+[assembly: AssemblyProduct("Stick Note")]
+[assembly: AssemblyCopyright("{{copyright}}")]
+[assembly: AssemblyVersion("{{numericVersion}}")]
+[assembly: AssemblyFileVersion("{{numericVersion}}")]
+[assembly: AssemblyInformationalVersion("{{version}}")]

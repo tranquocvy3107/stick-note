@@ -1,0 +1,20 @@
+{
+  "_comment": "Pinned third-party downloads used by the packaging scripts. To bump Node.js run: node tools/package/runtime.mjs update <version>. The Node.js SHA-256 values come from https://nodejs.org/dist/v<version>/SHASUMS256.txt and are checked on every build. For the AppImage tools, copy the digest GitHub shows for the release asset and check it after downloading.",
+  "node": {
+    "version": "24.22.3",
+    "sha256": {
+      "win-x64.zip": "e612af99f626ab415ea225af6bce5c971feb448cb5cae250bb1c3fa50c5f7d9f",
+      "linux-x64.tar.xz": "4f2b175a6d53a5c617a80dba2676238a0688cef28c6da4eba35c7d844e66fcfb"
+    }
+  },
+  "appimagetool": {
+    "version": "1.9.1",
+    "url": "https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage",
+    "sha256": "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0"
+  },
+  "appimageRuntime": {
+    "version": "20251108",
+    "url": "https://github.com/AppImage/type2-runtime/releases/download/20251108/runtime-x86_64",
+    "sha256": "2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d"
+  }
+}

@@ -1,0 +1,17 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Stick Note
+Source: {{homepage}}
+
+Files: *
+Copyright: {{copyright}}
+License: MIT
+
+Files: opt/stick-note/runtime/*
+Copyright: Node.js contributors, and the authors of the components bundled in Node.js
+License: Node.js
+ Node.js is released under the MIT license together with the licenses of the
+ third-party components it contains. The complete text is in
+ /opt/stick-note/runtime/LICENSE-node.txt.
+
+License: MIT
+{{mitText}}

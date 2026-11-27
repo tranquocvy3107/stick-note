@@ -1,5 +1,9 @@
-# Dữ liệu cá nhân của người dùng: không bao giờ commit
+# A user's personal notes: never commit them
 data/
+
+# Build output and caches of the packaging scripts
+dist/
+.cache/
 
 node_modules/
 *.log

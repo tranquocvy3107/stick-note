@@ -1,88 +1,130 @@
-# Stick Note
+<p align="center">
+  <img src="public/icons/icon-192.png" width="96" height="96" alt="Stick Note icon">
+</p>
 
-[![CI](https://github.com/tranquocvy3107/stick-note/actions/workflows/ci.yml/badge.svg)](https://github.com/tranquocvy3107/stick-note/actions/workflows/ci.yml)
-[![Phiên bản](https://img.shields.io/github/v/release/tranquocvy3107/stick-note)](https://github.com/tranquocvy3107/stick-note/releases/latest)
-[![Giấy phép: MIT](https://img.shields.io/badge/gi%E1%BA%A5y_ph%C3%A9p-MIT-green)](LICENSE)
+<h1 align="center">Stick Note</h1>
 
-Whiteboard giấy nhớ của riêng bạn. Chỉ có một tấm bảng: kéo mảnh giấy vào, ghi chữ, link hoặc dán ảnh, rồi để nguyên đó. Không thư mục, không thẻ, không danh sách. Vị trí trên bảng chính là cách bạn nhớ.
+<p align="center">
+  <b>One whiteboard. Stick a note anywhere, find it by remembering where you put it.</b>
+</p>
 
-![Stick Note: các mảnh giấy màu trên tấm bảng, giao diện sáng](docs/screenshot-light.png)
+<p align="center">
+  <a href="https://github.com/tranquocvy3107/stick-note/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/tranquocvy3107/stick-note"></a>
+  <a href="https://github.com/tranquocvy3107/stick-note/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/tranquocvy3107/stick-note/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green"></a>
+</p>
+
+![Stick Note: colourful paper notes spread over one big whiteboard](docs/screenshot-light.png)
+
+Stick Note is a private notes app with **one screen**: a big, endless whiteboard. Drag a paper slip onto it, type a thought or paste a link, and leave it there. No folders, no tags, no lists. **Where you put a note is how you find it again.**
+
+- **Quick.** Drag a slip, double-click anywhere, or press `Ctrl+V` to turn text, links and screenshots into notes.
+- **Yours alone.** Everything stays on your computer. No account, no cloud, no tracking. Works offline.
+- **Safe.** Saves as you type, makes a backup every day, and keeps deleted notes in a trash for 60 days.
+- **Light.** Opens instantly and stays smooth (tested with 1,500+ notes). Available in English and Tiếng Việt.
+
+## Install
+
+Download **one file** from the [latest release](https://github.com/tranquocvy3107/stick-note/releases/latest) and double-click it. You do **not** need Node.js, a terminal or an account.
+
+| Your computer | Download | Then |
+|---|---|---|
+| **Windows 10 / 11** | `StickNote-<version>-windows-x64-setup.exe` | Double-click, click **Install**, click **Finish**. |
+| **Ubuntu, Debian, Linux Mint** | `stick-note_<version>_amd64.deb` | Double-click, click **Install**. |
+| **Any other Linux** | `StickNote-<version>-linux-x64.AppImage` | Right-click, **Properties**, allow running it as a program, then double-click. |
+
+Then open **Stick Note** from your Start menu, desktop or applications menu.
 
 <details>
-<summary>Giao diện tối</summary>
+<summary><b>Windows says "Windows protected your PC"</b></summary>
 
-![Stick Note: giao diện tối](docs/screenshot-dark.png)
-
+That message appears for every new app that is not code-signed yet (certificates cost money). Click **More info**, then **Run anyway**. If you want to check the download first, compare its SHA-256 with `SHA256SUMS.txt` on the release page, or run `gh attestation verify <file> --repo tranquocvy3107/stick-note` to prove it was built by this repository.
 </details>
 
-## Cài đặt
+<details>
+<summary><b>I don't want to install anything (portable)</b></summary>
 
-Cần Windows 10/11, **Node.js 20.11 trở lên** và Edge hoặc Chrome. Không cần `npm install`.
+Download `StickNote-<version>-windows-x64-portable.zip` (Windows) or `StickNote-<version>-linux-x64.tar.gz` (Linux), unpack it anywhere (a USB stick works), and run **Stick Note.exe** or `stick-note`. Your notes are saved in a `data` folder next to it, so copy the whole folder to move to another computer.
+</details>
 
-1. Vào [Releases](https://github.com/tranquocvy3107/stick-note/releases/latest), tải file `stick-note-<phiên bản>.zip`.
-2. Giải nén ra một thư mục cố định, ví dụ `D:\Apps\stick-note`.
-3. Làm theo phần "Mở app" bên dưới.
+<details>
+<summary><b>Linux tips</b></summary>
 
-Nâng cấp: giải nén bản mới ra thư mục mới rồi chép thư mục `data/` của bản cũ sang. Hoặc đặt biến môi trường `STICK_NOTE_DATA` trỏ tới một thư mục dữ liệu cố định để không phải chép.
+- Stick Note opens in its own window when **Chrome, Chromium, Edge or Brave** is installed. Otherwise it opens in a tab of your default browser, which works too.
+- If the AppImage refuses to start and mentions **FUSE**, install your distribution's `fuse3` package (a few older systems need `libfuse2` instead). The `.deb` has no such requirement.
+- Remove it with `sudo apt remove stick-note`. Your notes stay in `~/.local/share/stick-note`.
+</details>
 
-## Mở app
+**Updating:** run the new installer over the old one. Your notes are kept. **Uninstalling** never deletes your notes either.
 
-Bấm đúp **`start.bat`**. App mở thành một cửa sổ riêng (không thanh địa chỉ, không tab) và chạy hoàn toàn trên máy bạn, không cần mạng. Đóng cửa sổ là xong; máy chủ nhỏ chạy ngầm sẽ tự tắt sau khoảng 5 phút.
+<details>
+<summary><b>I used version 1.0 (unzipped folder with <code>start.bat</code>)</b></summary>
 
-Mở từ terminal thì gõ `.\start.bat` hoặc `npm start`. Máy này đặt biến `NoDefaultCurrentDirectoryInExePath=1` nên gõ trần `start.bat` sẽ báo "not recognized" (bấm đúp và shortcut không bị ảnh hưởng).
+If you keep running it from that folder, nothing changes: your notes stay in its `data` folder. To switch to the installer, quit Stick Note, install the new version, quit it again, and copy everything inside your old `data` folder into the new data folder: press `Win + R`, type `%APPDATA%\Stick Note` and press Enter on Windows (`~/.local/share/stick-note` on Linux). Then start Stick Note again.
+</details>
 
-Muốn có biểu tượng ngoài màn hình nền, chạy một lần:
+## Use it in 30 seconds
 
-```powershell
-powershell -ExecutionPolicy Bypass -File tools\create-shortcut.ps1
+| I want to... | Do this |
+|---|---|
+| Add a note | Drag a slip from the tray (bottom-left) onto the board and type. Or double-click the board, or press `N`. |
+| Paste fast | `Ctrl+V` turns text, a link or a screenshot into a note. |
+| Bring things in | Drop links, images, `.url` or `.txt` files onto the board. |
+| Edit | Double-click the note (or press `Enter`). `Esc` or a click outside finishes. |
+| Reuse | Click a link to open it; the small button beside it copies it. `Ctrl+C` copies a whole note. Double-click an image to see it large. |
+| Move around | Drag the background, scroll, use the arrow keys, or hold `Space` and drag. |
+| Zoom | `Ctrl` + scroll, or the `+` / `-` buttons. |
+| Come back | `Home` returns to the start. `Shift+1` shows every note. |
+| Search | `Ctrl+F` or `/`. Matching notes light up and nothing moves. Accents are ignored. |
+| Keep a note in place | Click its pin icon to lock its position. |
+| Delete | Press `Delete` or drag it onto the trash can. The trash keeps notes for 60 days. |
+| Undo | `Ctrl+Z` and `Ctrl+Y`. |
+| Select several | `Shift` + drag on the background, `Shift` + click, or `Ctrl+A`. |
+| Switch language or theme | Menu (the three dots), then **Language** or **Appearance**. |
+
+Press `?` inside the app for the full list. Quit with Menu, **Quit Stick Note** (closing the window also lets it stop by itself after a few minutes).
+
+## Your notes and your privacy
+
+- Notes live in a **data folder** on your computer: `%APPDATA%\Stick Note` on Windows, `~/.local/share/stick-note` on Linux, or the `data` folder next to the app for portable copies. Open it from the menu: **Open data folder**.
+- The folder holds `board.json` (your notes), `images/`, `backups/` (one backup per day, plus an extra one if many notes disappear suddenly) and `server.log`. Copy the folder to back up or move.
+- Stick Note talks only to your own computer (`127.0.0.1`). It sends nothing anywhere.
+- **Notes are stored as ordinary files and are not encrypted yet.** Encryption is on the [roadmap](#roadmap). Until then, do not keep secrets in it unless your disk is encrypted (BitLocker on Windows, LUKS on Linux).
+
+## Something wrong?
+
+| Problem | What to do |
+|---|---|
+| "Can't reach the server" | Close the window and open Stick Note again from its shortcut. The page reconnects by itself. |
+| It opens in a browser tab, not its own window | Install Edge, Chrome, Chromium or Brave. Firefox cannot open app windows. |
+| "Port 4747 is in use" | Another program uses it. Set the environment variable `PORT` to another number, then start Stick Note again. |
+| I deleted too much | Press `Ctrl+Z` right away. Otherwise open the trash, or copy a file from `backups/` over `board.json` (quit Stick Note first). |
+| I want to see what the server is doing | Read `server.log` in the data folder. |
+
+Still stuck? [Open an issue](https://github.com/tranquocvy3107/stick-note/issues/new/choose); it helps a lot if you say which system and which Stick Note version you use (shown in the file name you downloaded).
+
+## For developers
+
+Stick Note is a zero-dependency Node.js server (`server.js`, `src/`) plus a vanilla JavaScript interface (`public/`), with no build step.
+
+```bash
+git clone https://github.com/tranquocvy3107/stick-note.git
+cd stick-note
+npm test                # needs Node.js 20.11 or newer
+node server.js --open   # start it and open the app window (also: ./start.sh, start.bat)
 ```
 
-Thêm `-StartMenu` nếu muốn cả trong menu Start. Máy cần có Node.js (đã cài sẵn thì không phải làm gì thêm).
+- [CONTRIBUTING.md](CONTRIBUTING.md): ground rules, project layout, tests, translations.
+- [tools/package/README.md](tools/package/README.md): how the installers are built.
+- [CLAUDE.md](CLAUDE.md): architecture notes and decisions (written for AI coding agents, useful for people too).
+- [SECURITY.md](SECURITY.md): how to report a vulnerability.
 
-## Cách dùng
+## Roadmap
 
-| Việc cần làm | Cách làm |
-|---|---|
-| Thêm giấy | Kéo một tờ ở khay góc dưới trái vào bảng rồi gõ. Hoặc nhấp đúp lên nền, hoặc phím `N` |
-| Dán nhanh | `Ctrl+V` dán chữ, link hoặc ảnh chụp màn hình thành một mảnh giấy mới |
-| Kéo từ ngoài vào | Thả link, ảnh, file `.url` hoặc `.txt` thẳng lên bảng |
-| Sửa | Nhấp đúp (hoặc `Enter`). `Esc` hoặc nhấp ra ngoài là xong |
-| Dùng lại | Bấm link để mở. Nút nhỏ cạnh link để copy link. `Ctrl+C` copy cả mảnh giấy. Nhấp đúp vào ảnh để xem lớn |
-| Di chuyển bảng | Kéo nền, cuộn chuột, phím mũi tên, hoặc giữ `Space` rồi kéo |
-| Zoom | `Ctrl` + cuộn chuột, hoặc nút `+` `-` ở góc trên phải |
-| Về chỗ cũ | `Home` về vị trí gốc 100%. `Shift+1` xem tất cả mảnh giấy |
-| Tìm | `Ctrl+F` hoặc `/`. Mảnh khớp sáng lên, vị trí không đổi. Gõ không dấu cũng tìm ra tiếng Việt |
-| Ghim | Biểu tượng ghim trên mảnh giấy khóa vị trí để không kéo nhầm |
-| Xóa | `Delete` hoặc kéo vào thùng rác. Giấy được giữ 60 ngày, khôi phục trong ngăn thùng rác |
-| Hoàn tác | `Ctrl+Z` / `Ctrl+Y` |
-| Chọn nhiều | `Shift` + kéo trên nền, hoặc `Shift` + bấm, hoặc `Ctrl+A` |
+- **Zones:** draw labelled areas on the board (important, low priority, private...) and move them with their notes.
+- **A vault for sensitive notes:** encryption with a passphrase, private zones, version history, and backup and restore tools.
+- **macOS** builds.
 
-Bấm `?` trong app để xem bảng phím tắt đầy đủ.
-
-## Dữ liệu của bạn nằm ở đâu
-
-Trong thư mục **`data/`** cạnh app:
-
-- `board.json`: toàn bộ mảnh giấy và thùng rác
-- `images/`: ảnh bạn dán (giữ nguyên bản gốc, kèm bản thu nhỏ để bảng nhẹ)
-- `backups/`: mỗi ngày một bản sao lưu, thêm một bản khi số mảnh giấy đột ngột giảm mạnh, và các bản bạn tự bấm "Sao lưu ngay" trong menu
-- `server.log`: nhật ký của máy chủ, chỉ xem khi có sự cố
-
-Chép cả thư mục `data/` là đủ để chuyển sang máy khác. Muốn đặt dữ liệu ở chỗ khác (ví dụ trong OneDrive để tự đồng bộ), đặt biến môi trường `STICK_NOTE_DATA` trỏ tới thư mục đó trước khi chạy `start.bat`. Menu `⋯` có mục **Mở thư mục dữ liệu**.
-
-App lưu tự động sau mỗi thay đổi. Nếu máy chủ tắt giữa chừng, app báo bằng dải đỏ, giữ tạm ghi chú trong cửa sổ và tự lưu lại khi kết nối trở lại. Mở hai cửa sổ cùng lúc cũng không mất gì: thay đổi của hai bên được gộp lại.
-
-## Khi có sự cố
-
-- **Cửa sổ báo "Chưa kết nối được máy chủ"**: bấm lại `start.bat`. Cửa sổ cũ sẽ tự nối lại.
-- **Muốn xem lỗi**: chạy `start-debug.bat` (hiện log ngay trên màn hình), hoặc mở `data/server.log`.
-- **Cổng 4747 bị chương trình khác dùng**: đặt biến môi trường `PORT` sang số khác rồi chạy lại.
-- **Lỡ xóa nhiều mảnh giấy**: thử `Ctrl+Z` ngay; nếu đã đóng app thì lấy từ ngăn thùng rác, hoặc chép lại `backups/board-<ngày>.json` thành `board.json` (tắt app trước khi chép).
-
-## Dành cho người sửa code
-
-Xem `CLAUDE.md`. Kiểm thử tự động: `npm test`. Lịch sử phiên bản nằm trong `CHANGELOG.md`.
-
-## Giấy phép
+## License
 
 [MIT](LICENSE)

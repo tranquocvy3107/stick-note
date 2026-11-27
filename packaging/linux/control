@@ -1,0 +1,23 @@
+Package: stick-note
+Version: {{version}}
+Architecture: amd64
+Maintainer: {{maintainer}}
+Installed-Size: {{installedSize}}
+Section: utils
+Priority: optional
+Homepage: {{homepage}}
+# The bundled Node.js needs glibc 2.28 and the C++ runtime (checked against its symbol versions).
+Depends: libc6 (>= 2.28), libgcc-s1 (>= 4.2), libstdc++6 (>= 6)
+# Suggests, not Recommends: apt must never pull in a browser (on Ubuntu "chromium" is a snap).
+# Without any of these Stick Note opens in the default browser, which works too.
+Suggests: chromium | chromium-browser | google-chrome-stable | microsoft-edge-stable | brave-browser
+Description: Personal whiteboard of sticky notes
+ Stick Note is a private notes app with one endless whiteboard. Drag a paper
+ slip onto the board, type a thought, paste a link or a screenshot, and leave
+ it where it is: where you put a note is how you find it again.
+ .
+ Everything stays on your computer and works offline. The notes are saved in
+ ~/.local/share/stick-note. The program runs in its own window when Chrome,
+ Chromium, Edge or Brave is installed, and in your default browser otherwise.
+ .
+ A Node.js runtime is included, so nothing else needs to be installed.

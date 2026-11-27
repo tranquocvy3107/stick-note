@@ -1,4 +1,4 @@
-// Kiểm thử máy chủ: API, bảo mật, ảnh, backup và khôi phục. Chạy: npm test
+// Server tests: API, security, images, backups and recovery. Run with: npm test
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,10 +19,10 @@ const today = () => {
   const d = new Date();
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 };
-const note = (id, extra = {}) => ({ id, k: 'text', x: 10, y: 20, w: 220, t: `ghi chú ${id}`, mt: 1, ...extra });
+const note = (id, extra = {}) => ({ id, k: 'text', x: 10, y: 20, w: 220, t: `note ${id}`, mt: 1, ...extra });
 
-async function boot(dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stick-note-test-'))) {
-  const app = createApp({ port: 0, dataDir: dir, logToConsole: false });
+async function boot(dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stick-note-test-')), options = {}) {
+  const app = createApp({ port: 0, dataDir: dir, logToConsole: false, buildInfo: {}, ...options });
   const port = await app.listen();
   const base = `http://127.0.0.1:${port}`;
   return {
@@ -40,7 +40,7 @@ async function boot(dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stick-note-test
   };
 }
 
-// Gửi request với header Host tùy ý (fetch không cho đổi Host).
+// Send a request with an arbitrary Host header (fetch does not allow changing it).
 function rawRequest(port, { method = 'GET', url, headers = {}, body }) {
   return new Promise((resolve, reject) => {
     const req = http.request({ host: '127.0.0.1', port, method, path: url, headers }, (res) => {
@@ -54,7 +54,7 @@ function rawRequest(port, { method = 'GET', url, headers = {}, body }) {
   });
 }
 
-test('ping cho biết đây là Stick Note', async () => {
+test('ping identifies the server as Stick Note', async () => {
   const s = await boot();
   try {
     const res = await fetch(`${s.base}/api/ping`);
@@ -63,13 +63,14 @@ test('ping cho biết đây là Stick Note', async () => {
   } finally { await s.close(); }
 });
 
-test('bảng trống, lưu rồi đọc lại đúng nguyên văn tiếng Việt', async () => {
+test('an empty board is saved and read back with non-ASCII text intact', async () => {
   const s = await boot();
   try {
     const empty = await s.get();
     assert.equal(empty.rev, 0);
     assert.deepEqual(empty.board, { notes: [], trash: [] });
 
+    // Vietnamese sample: diacritics and a percent-free URL must survive the round trip byte for byte.
     const text = 'Họp thứ Hai 10h — https://example.com/Việt_Nam?q=đ&x=1';
     const res = await s.put(0, { notes: [note('n1', { t: text })], trash: [] });
     assert.equal(res.status, 200);
@@ -82,22 +83,26 @@ test('bảng trống, lưu rồi đọc lại đúng nguyên văn tiếng Việt
     const onDisk = JSON.parse(fs.readFileSync(path.join(s.dir, 'board.json'), 'utf8'));
     assert.equal(onDisk.rev, 1);
     assert.equal(onDisk.notes[0].t, text);
-    assert.equal(fs.readdirSync(s.dir).filter((f) => f.endsWith('.tmp')).length, 0, 'không để lại file tạm');
+    assert.equal(fs.readdirSync(s.dir).filter((f) => f.endsWith('.tmp')).length, 0, 'no temp files are left behind');
   } finally { await s.close(); }
 });
 
-test('request ghi phải có header riêng và Origin hợp lệ', async () => {
+test('writes need the custom header and a valid Origin', async () => {
   const s = await boot();
   try {
     const board = { notes: [note('n1')], trash: [] };
-    assert.equal((await s.put(0, board, {})).status, 403, 'thiếu header');
-    assert.equal((await s.put(0, board, { ...WRITE, Origin: 'https://evil.example' })).status, 403, 'Origin lạ');
-    assert.equal((await s.put(0, board, { ...WRITE, Origin: s.base })).status, 200, 'Origin của chính app');
+    const noHeader = await s.put(0, board, {});
+    assert.equal(noHeader.status, 403, 'missing header');
+    assert.equal((await noHeader.json()).error, 'missing_header');
+    const evil = await s.put(0, board, { ...WRITE, Origin: 'https://evil.example' });
+    assert.equal(evil.status, 403, 'foreign Origin');
+    assert.equal((await evil.json()).error, 'bad_origin');
+    assert.equal((await s.put(0, board, { ...WRITE, Origin: s.base })).status, 200, "the app's own Origin");
     assert.equal((await s.get()).rev, 1);
   } finally { await s.close(); }
 });
 
-test('từ chối Host lạ (chống DNS rebinding)', async () => {
+test('foreign Host headers are rejected (DNS rebinding protection)', async () => {
   const s = await boot();
   try {
     const bad = await rawRequest(s.port, { url: '/api/board', headers: { Host: 'evil.example' } });
@@ -109,20 +114,21 @@ test('từ chối Host lạ (chống DNS rebinding)', async () => {
   } finally { await s.close(); }
 });
 
-test('baseRev cũ nhận 409 kèm bảng hiện tại để gộp', async () => {
+test('a stale baseRev gets 409 with the current board so the client can merge', async () => {
   const s = await boot();
   try {
     await s.put(0, { notes: [note('a')], trash: [] });
     const stale = await s.put(0, { notes: [note('b')], trash: [] });
     assert.equal(stale.status, 409);
     const body = await stale.json();
+    assert.equal(body.error, 'conflict');
     assert.equal(body.rev, 1);
     assert.deepEqual(body.board.notes.map((n) => n.id), ['a']);
-    assert.deepEqual((await s.get()).board.notes.map((n) => n.id), ['a'], 'bản cũ không ghi đè được');
+    assert.deepEqual((await s.get()).board.notes.map((n) => n.id), ['a'], 'a stale copy cannot overwrite newer data');
   } finally { await s.close(); }
 });
 
-test('từ chối dữ liệu bảng sai định dạng', async () => {
+test('malformed board data is rejected', async () => {
   const s = await boot();
   try {
     assert.equal((await s.put(0, { notes: 'x', trash: [] })).status, 400);
@@ -130,26 +136,27 @@ test('từ chối dữ liệu bảng sai định dạng', async () => {
     assert.equal((await s.put(0, null)).status, 400);
     const raw = await fetch(`${s.base}/api/board`, { method: 'PUT', headers: { ...WRITE, 'Content-Type': 'application/json' }, body: '{not json' });
     assert.equal(raw.status, 400);
-    assert.equal((await s.get()).rev, 0, 'dữ liệu cũ vẫn nguyên');
+    assert.equal((await raw.json()).error, 'invalid_json');
+    assert.equal((await s.get()).rev, 0, 'existing data is untouched');
   } finally { await s.close(); }
 });
 
-test('mỗi ngày có một bản backup, là trạng thái trước khi ghi đè', async () => {
+test('a daily backup holds the state before the overwrite', async () => {
   const s = await boot();
   try {
     await s.put(0, { notes: [note('first')], trash: [] });
     const backups = path.join(s.dir, 'backups');
-    assert.equal(fs.readdirSync(backups).length, 0, 'lần ghi đầu chưa có gì để backup');
+    assert.equal(fs.readdirSync(backups).length, 0, 'the first save has nothing to back up');
     await s.put(1, { notes: [note('first'), note('second')], trash: [] });
     const file = path.join(backups, `board-${today()}.json`);
     assert.ok(fs.existsSync(file));
     assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).notes.map((n) => n.id), ['first']);
     await s.put(2, { notes: [note('first'), note('second'), note('third')], trash: [] });
-    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).notes.map((n) => n.id), ['first'], 'không ghi đè backup của ngày');
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).notes.map((n) => n.id), ['first'], "a day's backup is never overwritten");
   } finally { await s.close(); }
 });
 
-test('số mảnh giấy giảm mạnh thì giữ thêm một bản backup riêng', async () => {
+test('a sharp drop in the number of notes keeps an extra backup', async () => {
   const s = await boot();
   try {
     const many = Array.from({ length: 10 }, (_, i) => note(`n${i}`));
@@ -158,11 +165,11 @@ test('số mảnh giấy giảm mạnh thì giữ thêm một bản backup riên
     const shrink = fs.readdirSync(path.join(s.dir, 'backups')).filter((f) => f.includes('before-shrink'));
     assert.equal(shrink.length, 1);
     const saved = JSON.parse(fs.readFileSync(path.join(s.dir, 'backups', shrink[0]), 'utf8'));
-    assert.equal(saved.notes.length, 10, 'bản backup chứa đủ 10 mảnh trước khi giảm');
+    assert.equal(saved.notes.length, 10, 'the backup holds all 10 notes from before the drop');
   } finally { await s.close(); }
 });
 
-test('board.json hỏng thì tự khôi phục từ backup mới nhất', async () => {
+test('a damaged board.json is recovered from the newest backup', async () => {
   const s = await boot();
   await s.put(0, { notes: [note('keep-me')], trash: [] });
   await s.put(1, { notes: [note('keep-me'), note('lost')], trash: [] });
@@ -173,12 +180,12 @@ test('board.json hỏng thì tự khôi phục từ backup mới nhất', async 
     try {
       const board = await s2.get();
       assert.deepEqual(board.board.notes.map((n) => n.id), ['keep-me']);
-      assert.ok(fs.readdirSync(s.dir).some((f) => f.startsWith('board.corrupt-')), 'file hỏng được giữ lại để xem');
+      assert.ok(fs.readdirSync(s.dir).some((f) => f.startsWith('board.corrupt-')), 'the damaged file is kept for inspection');
     } finally { await s2.close({ keep: true }); }
   } finally { fs.rmSync(s.dir, { recursive: true, force: true }); }
 });
 
-test('khởi động lại server vẫn nhớ dữ liệu và số revision', async () => {
+test('a restarted server remembers the data and the revision number', async () => {
   const s = await boot();
   await s.put(0, { notes: [note('persisted')], trash: [note('gone', { del: 5 })] });
   await s.close({ keep: true });
@@ -193,7 +200,7 @@ test('khởi động lại server vẫn nhớ dữ liệu và số revision', as
   } finally { fs.rmSync(s.dir, { recursive: true, force: true }); }
 });
 
-test('ảnh: tải lên theo nội dung, trùng thì dùng chung, phục vụ với cache lâu dài', async () => {
+test('images are stored by content, deduplicated and served with long-lived caching', async () => {
   const s = await boot();
   try {
     const up = () => fetch(`${s.base}/api/images`, { method: 'POST', headers: { ...WRITE, 'Content-Type': 'image/png' }, body: PNG });
@@ -211,11 +218,12 @@ test('ảnh: tải lên theo nội dung, trùng thì dùng chung, phục vụ v�
   } finally { await s.close(); }
 });
 
-test('ảnh: từ chối file không phải ảnh, id sai và đường dẫn thoát thư mục', async () => {
+test('images: non-images, bad ids and path traversal are rejected', async () => {
   const s = await boot();
   try {
     const junk = await fetch(`${s.base}/api/images`, { method: 'POST', headers: { ...WRITE, 'Content-Type': 'image/png' }, body: Buffer.from('<script>alert(1)</script> this is not an image') });
     assert.equal(junk.status, 415);
+    assert.equal((await junk.json()).error, 'unsupported_image');
     assert.equal((await fetch(`${s.base}/img/${'a'.repeat(40)}.png`)).status, 404);
     assert.equal((await fetch(`${s.base}/img/..%2f..%2fboard.json`)).status, 404);
     assert.equal((await fetch(`${s.base}/img/not-an-id`)).status, 404);
@@ -224,12 +232,12 @@ test('ảnh: từ chối file không phải ảnh, id sai và đường dẫn th
   } finally { await s.close(); }
 });
 
-test('ảnh thu nhỏ chỉ nhận khi ảnh gốc đã có', async () => {
+test('a thumbnail is accepted only when its original exists', async () => {
   const s = await boot();
   try {
     const post = (of) => fetch(`${s.base}/api/thumb?of=${of}`, { method: 'POST', headers: { ...WRITE, 'Content-Type': 'image/png' }, body: PNG });
-    assert.equal((await post(`${'b'.repeat(40)}.png`)).status, 400, 'gốc chưa có');
-    assert.equal((await post('../../etc/passwd')).status, 400, 'id sai');
+    assert.equal((await post(`${'b'.repeat(40)}.png`)).status, 400, 'no such original');
+    assert.equal((await post('../../etc/passwd')).status, 400, 'bad id');
     const { id } = await (await fetch(`${s.base}/api/images`, { method: 'POST', headers: { ...WRITE, 'Content-Type': 'image/png' }, body: PNG })).json();
     const res = await post(id);
     assert.equal(res.status, 200);
@@ -239,7 +247,7 @@ test('ảnh thu nhỏ chỉ nhận khi ảnh gốc đã có', async () => {
   } finally { await s.close(); }
 });
 
-test('file tĩnh: có CSP, chặn thoát thư mục, 404 khi không có', async () => {
+test('static files: CSP is set, traversal is blocked, unknown paths return 404', async () => {
   const s = await boot();
   try {
     const index = await fetch(`${s.base}/`);
@@ -264,7 +272,29 @@ test('file tĩnh: có CSP, chặn thoát thư mục, 404 khi không có', async 
   } finally { await s.close(); }
 });
 
-test('sniffImage nhận đúng định dạng theo nội dung chứ không theo đuôi', () => {
+test('/api/info reports how this copy was packaged', async () => {
+  const source = await boot();
+  const packaged = await boot(undefined, { buildInfo: { channel: 'linux-deb' } });
+  try {
+    assert.equal((await (await fetch(`${source.base}/api/info`)).json()).channel, 'source');
+    assert.equal((await (await fetch(`${packaged.base}/api/info`)).json()).channel, 'linux-deb');
+  } finally { await source.close(); await packaged.close(); }
+});
+
+test('POST /api/shutdown needs the custom header and calls the shutdown hook', async () => {
+  let called = 0;
+  const s = await boot(undefined, { onShutdown: () => { called += 1; } });
+  try {
+    assert.equal((await fetch(`${s.base}/api/shutdown`, { method: 'POST' })).status, 403);
+    assert.equal(called, 0);
+    const res = await fetch(`${s.base}/api/shutdown`, { method: 'POST', headers: WRITE });
+    assert.equal(res.status, 200);
+    await new Promise((r) => setTimeout(r, 150));
+    assert.equal(called, 1);
+  } finally { await s.close(); }
+});
+
+test('sniffImage detects the format from content, not from the file name', () => {
   assert.equal(sniffImage(PNG), 'png');
   assert.equal(sniffImage(Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0])), 'jpg');
   assert.equal(sniffImage(Buffer.from('GIF89a......')), 'gif');

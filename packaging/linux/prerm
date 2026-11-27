@@ -1,0 +1,14 @@
+#!/bin/sh
+# Stop a running Stick Note before its files are removed or replaced (package removal and upgrade).
+# The notes live in each user's own folder and are never touched here.
+set -e
+
+case "$1" in
+  remove|upgrade|deconfigure)
+    if [ -x /opt/stick-note/runtime/node ] && [ -f /opt/stick-note/app/server.js ]; then
+      /opt/stick-note/runtime/node /opt/stick-note/app/server.js --stop || true
+    fi
+    ;;
+esac
+
+exit 0

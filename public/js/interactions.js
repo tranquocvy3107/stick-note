@@ -1,8 +1,8 @@
-// Mọi thao tác của người dùng trên bảng: chọn, kéo, đổi cỡ, sửa chữ, phím tắt, copy, xóa, hoàn tác.
+// Everything the user does on the board: select, drag, resize, edit text, shortcuts, copy, delete, undo.
 //
-// Cách làm: các cử chỉ chuột/cảm ứng (kéo giấy, kéo nền, chọn vùng, đổi cỡ, chụm 2 ngón) đều là
-// một "gesture" tại một thời điểm. Trong lúc kéo ta chỉ đổi DOM cho mượt, khi thả mới ghi vào store
-// (một lần, thành một bước hoàn tác).
+// How it works: mouse and touch gestures (dragging a note, dragging the background, area select, resize,
+// two-finger pinch) are each one "gesture" at a time. While dragging we only change the DOM, to stay smooth;
+// the store is written once on release (one undo step).
 
 import * as store from './store.js';
 import { clamp, isTextField, readingOrder, writeClipboardText } from './util.js';
@@ -10,8 +10,9 @@ import { MIN_W, MAX_W, NOTE_H } from './constants.js';
 import { imgUrl } from './api.js';
 import { placeAt } from './noteview.js';
 import { toPngBlob } from './image.js';
+import { t } from './i18n.js';
 
-const DRAG_THRESHOLD = 4; // px: di chuyển ít hơn mức này vẫn tính là "bấm", tránh kéo nhầm khi bấm vào link
+const DRAG_THRESHOLD = 4; // px: moving less than this still counts as a click, so clicking a link never drags by accident
 
 export function createInteractions({ board, world, view, layer, ui }) {
   const { state } = store;
@@ -28,10 +29,10 @@ export function createInteractions({ board, world, view, layer, ui }) {
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const selected = () => [...selection];
 
-  // ------------------------------------------------------------ chọn
+  // ------------------------------------------------------------ selection
 
-  // Thanh công cụ nằm phía trên mảnh giấy. Nếu mảnh giấy sát mép trên hoặc mép trái màn hình
-  // thì lật thanh xuống dưới / sang phải để không bị cắt mất.
+  // The toolbar sits above a note. If the note is close to the top or left edge of the screen,
+  // flip the toolbar below / to the right so it is not cut off.
   function updateFlip(el) {
     const r = el.getBoundingClientRect();
     el.toggleAttribute('data-flip-y', r.top < 64);
@@ -72,16 +73,16 @@ export function createInteractions({ board, world, view, layer, ui }) {
     }
   });
 
-  // ------------------------------------------------------------ nhấp đúp (dùng chung cho chuột và cảm ứng)
+  // ------------------------------------------------------------ double click (shared by mouse and touch)
 
   function isDoubleTap(e, key) {
-    const t = performance.now();
-    const dbl = key === lastTap.key && t - lastTap.t < 380 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 24;
-    lastTap = dbl ? { t: 0, x: 0, y: 0, key: '' } : { t, x: e.clientX, y: e.clientY, key };
+    const now = performance.now();
+    const dbl = key === lastTap.key && now - lastTap.t < 380 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 24;
+    lastTap = dbl ? { t: 0, x: 0, y: 0, key: '' } : { t: now, x: e.clientX, y: e.clientY, key };
     return dbl;
   }
 
-  // ------------------------------------------------------------ sửa chữ
+  // ------------------------------------------------------------ editing text
 
   function startEdit(id, { isNew = false } = {}) {
     const n = state.notes.get(id);
@@ -98,15 +99,15 @@ export function createInteractions({ board, world, view, layer, ui }) {
     ta.className = 'editor';
     ta.value = n.t || '';
     ta.rows = 1;
-    ta.placeholder = n.k === 'image' ? 'Chú thích…' : 'Ghi gì đó…';
-    ta.setAttribute('aria-label', n.k === 'image' ? 'Chú thích ảnh' : 'Nội dung mảnh giấy');
+    ta.placeholder = n.k === 'image' ? t('edit.placeholder.image') : t('edit.placeholder.text');
+    ta.setAttribute('aria-label', n.k === 'image' ? t('edit.label.image') : t('edit.label.text'));
     const fit = () => {
       ta.style.height = '0px';
       ta.style.height = `${ta.scrollHeight}px`;
     };
     ta.addEventListener('input', fit);
     ta.addEventListener('keydown', (e) => {
-      if (e.isComposing) return; // đang gõ dở bằng bộ gõ (Telex, VNI...): để bộ gõ xử lý Esc/Enter
+      if (e.isComposing) return; // mid-composition in an input method (Telex, VNI, Pinyin...): let it handle Esc/Enter
       if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
@@ -116,7 +117,7 @@ export function createInteractions({ board, world, view, layer, ui }) {
         endEdit();
       }
     });
-    // Bấm ra ngoài thì xong. Bỏ qua khi cả cửa sổ mất focus (chuyển sang app khác để copy link).
+    // Clicking outside finishes editing. Ignored when the whole window loses focus (switching apps to copy a link).
     ta.addEventListener('blur', () => {
       if (!document.hasFocus()) return;
       setTimeout(() => {
@@ -125,7 +126,7 @@ export function createInteractions({ board, world, view, layer, ui }) {
     });
 
     el.querySelector('.body').replaceChildren(ta);
-    el._text = null; // buộc vẽ lại thân khi sửa xong
+    el._text = null; // force the body to be redrawn when editing ends
     el.classList.add('editing');
     editing = { id, ta, original: n.t || '', isNew };
     fit();
@@ -143,7 +144,7 @@ export function createInteractions({ board, world, view, layer, ui }) {
     if (n) {
       if (n.k === 'text' && text.trim() === '') {
         if (isNew) {
-          // Giấy mới mà không gõ gì: bỏ luôn, không để lại giấy trắng.
+          // A new note left empty: drop it rather than leaving a blank slip.
           store.discardNote(id);
           store.popCheckpoint();
         } else {
@@ -153,17 +154,17 @@ export function createInteractions({ board, world, view, layer, ui }) {
         }
         setSelection([]);
       } else if (text !== original) {
-        if (!isNew) store.checkpoint(); // giấy mới đã có checkpoint lúc tạo, gộp chung thành một bước hoàn tác
+        if (!isNew) store.checkpoint(); // a new note already got a checkpoint when it was created: one undo step covers both
         store.updateNotes([id], { t: text });
       }
     }
     layer.sync(id);
   }
 
-  // ------------------------------------------------------------ xóa, copy, màu, ghim
+  // ------------------------------------------------------------ delete, copy, colour, pin
 
   function announceDeleted(count) {
-    ui.toast(count > 1 ? `Đã bỏ ${count} mảnh giấy vào thùng rác` : 'Đã bỏ vào thùng rác', { action: 'Hoàn tác', run: undo });
+    ui.toast(t('toast.trashed', { count }), { action: t('common.undo'), run: undo });
   }
 
   function deleteIds(ids) {
@@ -180,32 +181,32 @@ export function createInteractions({ board, world, view, layer, ui }) {
       let blob = await (await fetch(imgUrl(n.img))).blob();
       if (blob.type !== 'image/png') blob = await toPngBlob(blob);
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-      ui.toast('Đã copy ảnh');
+      ui.toast(t('toast.imageCopied'));
     } catch (err) {
       ui.toast(err && err.name === 'NotAllowedError'
-        ? 'Trình duyệt không cho phép copy ảnh lúc này. Hãy thử lại.'
-        : `Không copy được ảnh: ${err && err.message ? err.message : err}`, { ms: 5000 });
+        ? t('toast.imageCopyDenied')
+        : t('toast.imageCopyFailed', { message: err && err.message ? err.message : err }), { ms: 5000 });
     }
   }
 
-  // Nội dung chữ của các mảnh giấy, theo thứ tự đọc (trên xuống, trái sang phải), cách nhau một dòng trống.
+  // The text of the notes in reading order (top to bottom, left to right), separated by a blank line.
   function collectText(ids) {
     const notes = readingOrder(ids.map((id) => state.notes.get(id)).filter(Boolean));
     return { notes, text: notes.map((n) => n.t || '').filter(Boolean).join('\n\n') };
   }
-  const copiedMessage = (count) => (count > 1 ? `Đã copy ${count} mảnh giấy` : 'Đã copy');
+  const copiedMessage = (count) => t('toast.copied', { count });
 
-  // Dùng cho các nút bấm trên mảnh giấy.
+  // Used by the buttons on a note.
   async function copyNotes(ids) {
     const { notes, text } = collectText(ids);
     if (!notes.length) return;
     if (notes.length === 1 && notes[0].k === 'image') return copyImage(notes[0]);
     if (!text) {
-      ui.toast('Mảnh giấy này chưa có chữ để copy');
+      ui.toast(t('toast.nothingToCopy'));
       return;
     }
     const ok = await writeClipboardText(text);
-    ui.toast(ok ? copiedMessage(notes.length) : 'Trình duyệt không cho copy, hãy thử lại');
+    ui.toast(ok ? copiedMessage(notes.length) : t('toast.copyDenied'));
   }
 
   function applyColor(ids, color) {
@@ -218,31 +219,31 @@ export function createInteractions({ board, world, view, layer, ui }) {
     const allPinned = ids.every((id) => state.notes.get(id)?.lock);
     store.checkpoint();
     store.updateNotes(ids, { lock: allPinned ? 0 : 1 });
-    ui.toast(allPinned ? 'Đã bỏ ghim, có thể kéo lại' : 'Đã ghim vị trí, sẽ không kéo nhầm được nữa', { ms: 2200 });
+    ui.toast(allPinned ? t('toast.unpinned') : t('toast.pinned'), { ms: 2200 });
   }
 
   function undo() {
     endEdit();
     if (store.undo()) {
       setSelection([]);
-      ui.toast('Đã hoàn tác', { ms: 1400 });
+      ui.toast(t('toast.undone'), { ms: 1400 });
     }
   }
   function redo() {
     endEdit();
     if (store.redo()) {
       setSelection([]);
-      ui.toast('Đã làm lại', { ms: 1400 });
+      ui.toast(t('toast.redone'), { ms: 1400 });
     }
   }
 
-  // ------------------------------------------------------------ cử chỉ
+  // ------------------------------------------------------------ gestures
 
   function capturePointer(id) {
-    try { board.setPointerCapture(id); } catch { /* con trỏ đã kết thúc */ }
+    try { board.setPointerCapture(id); } catch { /* the pointer has already ended */ }
   }
   function releasePointer(id) {
-    try { board.releasePointerCapture(id); } catch { /* không có gì để thả */ }
+    try { board.releasePointerCapture(id); } catch { /* nothing to release */ }
   }
   function cancelGesture() {
     const g = gesture;
@@ -250,7 +251,7 @@ export function createInteractions({ board, world, view, layer, ui }) {
     g?.onUp?.(null, true);
   }
 
-  // Kéo nền (hoặc giữ Space, hoặc nút giữa chuột) để di chuyển bảng.
+  // Drag the background (or hold Space, or use the middle mouse button) to move the board.
   function beginPan(e) {
     let last = { x: e.clientX, y: e.clientY };
     board.classList.add('panning');
@@ -269,7 +270,7 @@ export function createInteractions({ board, world, view, layer, ui }) {
     };
   }
 
-  // Bấm vào nền: nếu kéo thì di chuyển bảng, nếu chỉ bấm thì bỏ chọn; nhấp đúp thì tạo giấy mới.
+  // Press on the background: dragging moves the board, a plain click clears the selection, a double click makes a new note.
   function beginBackgroundPress(e) {
     const start = { x: e.clientX, y: e.clientY };
     let last = { ...start };
@@ -298,7 +299,7 @@ export function createInteractions({ board, world, view, layer, ui }) {
     };
   }
 
-  // Kéo vùng chọn (giữ Shift rồi kéo trên nền).
+  // Area select (hold Shift and drag on the background).
   function beginMarquee(e) {
     const box = ui.marqueeEl;
     const start = { x: e.clientX, y: e.clientY };
@@ -332,7 +333,7 @@ export function createInteractions({ board, world, view, layer, ui }) {
     };
   }
 
-  // Bấm vào một mảnh giấy: chọn, kéo di chuyển, hoặc nhấp đúp để sửa.
+  // Press on a note: select it, drag it, or double-click to edit.
   function beginNotePress(e, noteEl) {
     const id = noteEl.dataset.id;
     const note = state.notes.get(id);
@@ -351,7 +352,7 @@ export function createInteractions({ board, world, view, layer, ui }) {
     } else if (!selection.has(id)) {
       setSelection([id]);
     } else if (selection.size > 1) {
-      collapseOnUp = true; // đang chọn nhiều: bấm không kéo thì thu về một mảnh
+      collapseOnUp = true; // several are selected: a click without dragging narrows the selection to this one
     }
 
     const ids = selected();
@@ -377,7 +378,7 @@ export function createInteractions({ board, world, view, layer, ui }) {
           if (!movable.length) {
             if (!warned) {
               warned = true;
-              ui.toast('Mảnh giấy này đang được ghim. Bấm biểu tượng ghim trên nó để mở khóa.');
+              ui.toast(t('toast.pinnedHint'));
             }
             return;
           }
@@ -401,7 +402,7 @@ export function createInteractions({ board, world, view, layer, ui }) {
           suppressClickUntil = performance.now() + 120;
           movable.forEach((i) => layer.get(i)?.classList.remove('dragging'));
           if (cancelled) {
-            movable.forEach((i) => layer.sync(i)); // trả về chỗ cũ
+            movable.forEach((i) => layer.sync(i)); // put them back where they were
             return;
           }
           if (ui.overTrash(ev.clientX, ev.clientY)) {
@@ -420,7 +421,7 @@ export function createInteractions({ board, world, view, layer, ui }) {
         if (cancelled) return;
         if (collapseOnUp) setSelection([id]);
         if (!additive && isDoubleTap(ev, id)) {
-          suppressClickUntil = performance.now() + 120; // không để lần bấm thứ hai mở link
+          suppressClickUntil = performance.now() + 120; // keep the second click from opening a link
           const current = state.notes.get(id);
           if (current && current.k === 'image' && targetEl.closest('.media')) ui.openLightbox(current);
           else startEdit(id);
@@ -429,7 +430,7 @@ export function createInteractions({ board, world, view, layer, ui }) {
     };
   }
 
-  // Kéo góc dưới bên phải để đổi kích thước.
+  // Drag the bottom-right corner to resize.
   function beginResize(e, noteEl) {
     const id = noteEl.dataset.id;
     const note = state.notes.get(id);
@@ -467,7 +468,7 @@ export function createInteractions({ board, world, view, layer, ui }) {
     };
   }
 
-  // Chụm 2 ngón trên màn hình cảm ứng: zoom và di chuyển bảng.
+  // Two-finger pinch on a touch screen: zoom and pan the board.
   function beginPinch() {
     cancelGesture();
     const pts = () => [...pointers.values()];
@@ -491,11 +492,11 @@ export function createInteractions({ board, world, view, layer, ui }) {
     };
   }
 
-  // ------------------------------------------------------------ sự kiện con trỏ
+  // ------------------------------------------------------------ pointer events
 
   function onPointerDown(e) {
     if (e.button !== 0 && e.button !== 1) return;
-    if (e.pointerType === 'mouse') pointers.clear(); // phòng khi sót con trỏ cũ
+    if (e.pointerType === 'mouse') pointers.clear(); // in case a stale pointer was left behind
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.size === 2) {
       beginPinch();
@@ -503,20 +504,20 @@ export function createInteractions({ board, world, view, layer, ui }) {
     }
     if (pointers.size > 2) return;
 
-    const t = e.target;
-    if (!t.closest('.color-wrap')) closePalettes();
+    const target = e.target;
+    if (!target.closest('.color-wrap')) closePalettes();
     ui.closePopovers();
-    if (t.closest('textarea.editor')) return; // đang gõ chữ
-    if (t.closest('.tools') || t.closest('.lk-copy')) return; // nút trên mảnh giấy tự xử lý bằng click
+    if (target.closest('textarea.editor')) return; // typing text
+    if (target.closest('.tools') || target.closest('.lk-copy')) return; // buttons on a note handle themselves on click
 
     if (e.button === 1 || spaceDown) {
       e.preventDefault();
       beginPan(e);
       return;
     }
-    const noteEl = t.closest('.note');
+    const noteEl = target.closest('.note');
     if (noteEl) {
-      if (t.closest('.grip')) beginResize(e, noteEl);
+      if (target.closest('.grip')) beginResize(e, noteEl);
       else beginNotePress(e, noteEl);
       return;
     }
@@ -554,7 +555,7 @@ export function createInteractions({ board, world, view, layer, ui }) {
   window.addEventListener('pointercancel', onPointerEnd);
   board.addEventListener('pointerleave', () => { lastPointer = null; });
 
-  // Sau khi kéo, trình duyệt vẫn bắn sự kiện click: chặn để không lỡ mở link.
+  // After a drag the browser still fires a click: block it so a link is not opened by mistake.
   board.addEventListener('click', (e) => {
     if (performance.now() < suppressClickUntil) {
       e.preventDefault();
@@ -565,19 +566,19 @@ export function createInteractions({ board, world, view, layer, ui }) {
   board.addEventListener('contextmenu', (e) => {
     if (!e.target.closest('textarea')) e.preventDefault();
   });
-  // Chặn kéo-thả gốc của trình duyệt (ảnh, link) vì đã có cơ chế kéo riêng.
+  // Block the browser's native drag and drop (images, links): we have our own.
   document.addEventListener('dragstart', (e) => {
     if (!isTextField(e.target)) e.preventDefault();
   });
 
-  // ------------------------------------------------------------ nút trên mảnh giấy
+  // ------------------------------------------------------------ buttons on a note
 
   function closePalettes() {
     world.querySelectorAll('.color-wrap.open').forEach((el) => el.classList.remove('open'));
   }
 
-  // Bấm vào mảnh giấy không được để focus nằm lại trên link hay nút bên trong: nếu không, phím Enter
-  // sau đó sẽ "bấm" lại link đó thay vì sửa chữ. Chặn mặc định của mousedown (click vẫn chạy bình thường).
+  // Clicking a note must not leave focus on a link or button inside it: otherwise pressing Enter
+  // afterwards would "click" that link again instead of editing the text. Cancel the default of mousedown (click still works).
   world.addEventListener('mousedown', (e) => {
     if (!e.target.closest('textarea')) e.preventDefault();
   });
@@ -587,7 +588,7 @@ export function createInteractions({ board, world, view, layer, ui }) {
     if (linkCopy) {
       e.preventDefault();
       e.stopPropagation();
-      writeClipboardText(linkCopy.dataset.url).then((ok) => ui.toast(ok ? 'Đã copy link' : 'Trình duyệt không cho copy, hãy thử lại', { ms: 1800 }));
+      writeClipboardText(linkCopy.dataset.url).then((ok) => ui.toast(ok ? t('toast.linkCopied') : t('toast.copyDenied'), { ms: 1800 }));
       linkCopy.blur();
       return;
     }
@@ -622,7 +623,7 @@ export function createInteractions({ board, world, view, layer, ui }) {
     }
   });
 
-  // ------------------------------------------------------------ bàn phím
+  // ------------------------------------------------------------ keyboard
 
   const interactiveTarget = (el) => !!el?.closest?.('button, a, input, textarea, select');
 
@@ -654,7 +655,7 @@ export function createInteractions({ board, world, view, layer, ui }) {
       if (key === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
       if (key === 'y') { e.preventDefault(); redo(); return; }
       if (key === 'a') { e.preventDefault(); setSelection([...state.notes.keys()]); return; }
-      return; // Ctrl+C / Ctrl+V xử lý ở sự kiện copy / paste
+      return; // Ctrl+C / Ctrl+V are handled by the copy / paste events
     }
 
     if (inField || ui.blocking()) return;
@@ -703,7 +704,7 @@ export function createInteractions({ board, world, view, layer, ui }) {
     board.classList.remove('hand');
   });
 
-  // Ctrl+C khi đang chọn mảnh giấy (và không bôi đen chữ ở đâu): copy nội dung mảnh giấy.
+  // Ctrl+C with notes selected (and no text highlighted anywhere): copy the notes' content.
   document.addEventListener('copy', (e) => {
     if (isTextField(e.target) || isTextField(document.activeElement) || ui.blocking()) return;
     const sel = window.getSelection?.();
@@ -715,9 +716,9 @@ export function createInteractions({ board, world, view, layer, ui }) {
     if (notes.length === 1 && notes[0].k === 'image') {
       copyImage(notes[0]);
     } else if (!text) {
-      ui.toast('Mảnh giấy này chưa có chữ để copy');
+      ui.toast(t('toast.nothingToCopy'));
     } else if (e.clipboardData) {
-      // Ghi thẳng trong sự kiện copy: cách này không cần xin quyền clipboard nên đáng tin nhất.
+      // Write straight inside the copy event: it needs no clipboard permission, so it is the most reliable way.
       e.clipboardData.setData('text/plain', text);
       ui.toast(copiedMessage(notes.length), { ms: 1800 });
     } else {

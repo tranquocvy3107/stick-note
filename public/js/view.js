@@ -1,7 +1,7 @@
-// Khung nhìn của bảng vô hạn: kéo, cuộn, zoom.
-// File này chỉ làm toán tọa độ và gán transform, không biết gì về mảnh giấy.
+// The viewport of the infinite board: pan, scroll, zoom.
+// This file only does coordinate maths and sets the transform; it knows nothing about notes.
 //
-// Tọa độ "world" là tọa độ của mảnh giấy trên bảng. Tọa độ "screen" là pixel trên màn hình.
+// "world" coordinates are where notes sit on the board. "screen" coordinates are pixels on the display.
 //   screen = world * z + (x, y)
 
 import { clamp } from './util.js';
@@ -19,9 +19,9 @@ export function createView(board, world, { isBlocked = () => false } = {}) {
 
   function apply() {
     world.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.z})`;
-    // Lưới chấm bám theo bảng; thưa dần khi thu nhỏ để không bị dày đặc.
-    // Gán thẳng vào style chứ không dùng biến CSS: biến CSS được kế thừa xuống mọi mảnh giấy,
-    // đổi nó mỗi khung hình sẽ buộc trình duyệt tính lại style của cả nghìn phần tử.
+    // The dot grid follows the board and gets sparser as you zoom out so it never gets dense.
+    // Set on the style directly rather than through a CSS variable: variables are inherited by every note,
+    // and changing one every frame would force the browser to recalculate the style of thousands of elements.
     let gs = 28 * v.z;
     while (gs < 14) gs *= 2;
     board.style.backgroundSize = `${gs}px ${gs}px`;
@@ -77,7 +77,7 @@ export function createView(board, world, { isBlocked = () => false } = {}) {
     const step = (now) => {
       const p = clamp((now - t0) / ms, 0, 1);
       const e = easeOut(p);
-      v.z = from.z * (to.z / from.z) ** e; // zoom nội suy theo log cho tự nhiên
+      v.z = from.z * (to.z / from.z) ** e; // interpolate zoom logarithmically so it feels natural
       v.x = from.x + (to.x - from.x) * e;
       v.y = from.y + (to.y - from.y) * e;
       apply();
@@ -86,7 +86,7 @@ export function createView(board, world, { isBlocked = () => false } = {}) {
     raf = requestAnimationFrame(step);
   }
 
-  // Phóng to/thu nhỏ quanh tâm màn hình (nút +/-, phím tắt).
+  // Zoom in/out around the centre of the screen (the +/- buttons and shortcuts).
   function zoomStep(dir, ms = 180) {
     const { w, h } = size();
     const z = clamp(v.z * (dir > 0 ? 1.25 : 0.8), MIN_Z, MAX_Z);
@@ -105,14 +105,14 @@ export function createView(board, world, { isBlocked = () => false } = {}) {
     animateTo({ x: w / 2 - wx * z, y: h / 2 - wy * z, z });
   }
 
-  // Thu phóng để thấy trọn một hình chữ nhật (tọa độ world).
+  // Zoom so a whole rectangle (world coordinates) is visible.
   function fitRect(r, { pad = 90, maxZ = 1 } = {}) {
     const { w, h } = size();
     const z = clamp(Math.min((w - pad * 2) / Math.max(r.w, 1), (h - pad * 2) / Math.max(r.h, 1)), MIN_Z, maxZ);
     animateTo({ x: w / 2 - (r.x + r.w / 2) * z, y: h / 2 - (r.y + r.h / 2) * z, z });
   }
 
-  // Nếu hình chữ nhật (world) đang nằm ngoài tầm nhìn thì dời bảng để nó vào giữa. Giữ nguyên zoom.
+  // If a rectangle (world coordinates) is outside the view, pan so it is centred. The zoom stays as it is.
   function ensureVisible(r, margin = 80) {
     const { w, h } = size();
     const a = toScreen(r.x, r.y);
@@ -124,7 +124,7 @@ export function createView(board, world, { isBlocked = () => false } = {}) {
 
   const home = () => animateTo({ x: 0, y: 0, z: 1 });
 
-  // ---- cuộn chuột / touchpad: cuộn = di chuyển, Ctrl + cuộn (hoặc chụm 2 ngón) = zoom
+  // ---- mouse wheel / touchpad: scroll = pan, Ctrl + scroll (or a two-finger pinch) = zoom
   board.addEventListener('wheel', (e) => {
     if (isBlocked()) return;
     e.preventDefault();
@@ -133,7 +133,7 @@ export function createView(board, world, { isBlocked = () => false } = {}) {
     else if (e.deltaMode === 2) { deltaX *= innerWidth; deltaY *= innerHeight; }
 
     if (e.ctrlKey || e.metaKey) {
-      // Chụm 2 ngón trên touchpad cho delta nhỏ; con lăn chuột cho delta lớn (~100).
+      // A touchpad pinch produces small deltas; a mouse wheel produces large ones (~100).
       const speed = Math.abs(deltaY) < 40 ? 0.012 : 0.0018;
       zoomAt(e.clientX, e.clientY, Math.exp(-deltaY * speed));
     } else if (e.shiftKey && deltaX === 0) {

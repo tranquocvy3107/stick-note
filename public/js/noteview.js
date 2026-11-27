@@ -1,9 +1,10 @@
-// Vẽ mảnh giấy ra DOM: dựng, cập nhật, tô link. File này không xử lý sự kiện chuột/phím
-// (việc đó nằm ở interactions.js), chỉ đảm bảo DOM luôn khớp với dữ liệu trong store.
+// Draws notes into the DOM: builds them, updates them, turns links into anchors. This file does not handle
+// mouse or keyboard events (interactions.js does that); it only keeps the DOM in step with the store.
 
 import { h, splitLinks, shortUrl, breakable } from './util.js';
 import { icon } from './icons.js';
-import { COLORS, THUMB_MAX_W } from './constants.js';
+import { COLOR_KEYS, THUMB_MAX_W } from './constants.js';
+import { t } from './i18n.js';
 import { state, on } from './store.js';
 
 function toolButton(act, iconName, title) {
@@ -13,23 +14,23 @@ function toolButton(act, iconName, title) {
 function buildTools(n) {
   const isImage = n.k === 'image';
   const kids = [];
-  if (isImage) kids.push(toolButton('view', 'expand', 'Xem ảnh lớn'));
-  kids.push(toolButton('edit', 'pencil', isImage ? 'Sửa chú thích (Enter)' : 'Sửa chữ (Enter)'));
-  kids.push(toolButton('copy', 'copy', isImage ? 'Copy ảnh' : 'Copy nội dung (Ctrl+C)'));
+  if (isImage) kids.push(toolButton('view', 'expand', t('tool.view')));
+  kids.push(toolButton('edit', 'pencil', isImage ? t('tool.edit.image') : t('tool.edit.text')));
+  kids.push(toolButton('copy', 'copy', isImage ? t('tool.copy.image') : t('tool.copy.text')));
   kids.push(
     h('div', { class: 'color-wrap' },
-      toolButton('color', 'palette', 'Đổi màu giấy'),
+      toolButton('color', 'palette', t('tool.color')),
       h('div', { class: 'palette', role: 'menu' },
-        COLORS.map((c) => h('button', { type: 'button', class: 'swatch', dataset: { color: c.key }, title: c.name, 'aria-label': c.name })),
+        COLOR_KEYS.map((key) => h('button', { type: 'button', class: 'swatch', dataset: { color: key }, title: t(`color.${key}`), 'aria-label': t(`color.${key}`) })),
       ),
     ),
   );
-  kids.push(toolButton('pin', 'pin', 'Ghim vị trí'));
-  kids.push(toolButton('del', 'trash', 'Bỏ vào thùng rác (Delete)'));
+  kids.push(toolButton('pin', 'pin', t('tool.pin')));
+  kids.push(toolButton('del', 'trash', t('tool.del')));
   return h('div', { class: 'tools' }, kids);
 }
 
-// Chữ thường giữ nguyên, link thành <a> kèm nút copy. Không dùng innerHTML nên an toàn với mọi nội dung.
+// Plain text stays as it is; links become <a> with a copy button. No innerHTML, so any content is safe.
 export function renderText(container, text) {
   const frag = document.createDocumentFragment();
   for (const tok of splitLinks(text)) {
@@ -40,23 +41,23 @@ export function renderText(container, text) {
     frag.append(
       h('span', { class: 'lk' },
         h('a', { href: tok.href, target: '_blank', rel: 'noopener noreferrer', title: tok.href, draggable: 'false' }, breakable(shortUrl(tok.value))),
-        h('button', { type: 'button', class: 'lk-copy', dataset: { url: tok.href }, title: 'Copy link', 'aria-label': 'Copy link' }, icon('copy', 12)),
+        h('button', { type: 'button', class: 'lk-copy', dataset: { url: tok.href }, title: t('link.copy'), 'aria-label': t('link.copy') }, icon('copy', 12)),
       ),
     );
   }
   container.replaceChildren(frag);
 }
 
-// Thanh công cụ chỉ được dựng khi cần (di chuột vào hoặc chọn mảnh giấy), và chỉ giữ vài thanh cùng lúc.
-// Mỗi thanh gồm khoảng 35 phần tử (nút, biểu tượng, bảng màu): dựng sẵn cho cả nghìn mảnh giấy sẽ
-// khiến trình duyệt chậm hẳn dù chúng đang ẩn.
+// A note's toolbar is only built when needed (hover or selection), and only a few are kept alive at once.
+// Each toolbar is about 35 elements (buttons, icons, the colour palette): building them up front for
+// thousands of notes would slow the browser down badly even while they are hidden.
 const MAX_LIVE_TOOLS = 12;
 const liveTools = [];
 
 function syncTools(el, n) {
   const pin = el._tools?.querySelector('[data-act="pin"]');
   if (!pin) return;
-  const title = n.lock ? 'Bỏ ghim (cho phép kéo)' : 'Ghim vị trí (không kéo nhầm)';
+  const title = n.lock ? t('tool.unpin') : t('tool.pin');
   pin.classList.toggle('on', !!n.lock);
   pin.title = title;
   pin.setAttribute('aria-label', title);
@@ -101,7 +102,7 @@ export function buildNote(n) {
   const el = h('div', { class: 'note', dataset: { id: n.id } }, h('div', { class: 'pin' }));
   if (n.k === 'image') {
     const img = h('img', { alt: '', draggable: 'false', decoding: 'async' });
-    // Ảnh thu nhỏ lỗi thì dùng ảnh gốc.
+    // If the thumbnail fails to load, fall back to the original.
     img.addEventListener('error', () => {
       if (img.dataset.orig && img.dataset.src !== img.dataset.orig) {
         img.dataset.src = img.dataset.orig;
@@ -110,7 +111,7 @@ export function buildNote(n) {
     });
     el.append(h('div', { class: 'media' }, img));
   }
-  el.append(h('div', { class: 'body' }), h('div', { class: 'grip', title: 'Kéo để đổi kích thước' }));
+  el.append(h('div', { class: 'body' }), h('div', { class: 'grip', title: t('tool.resize') }));
   return el;
 }
 
@@ -149,7 +150,7 @@ export function updateNote(el, n, { tilt = true } = {}) {
 
   if (n.k === 'image') updateMedia(el, n);
 
-  // Đang sửa thì thân là ô nhập, đừng đè lên.
+  // While editing, the body is the text box: do not overwrite it.
   if (!el.classList.contains('editing') && el._text !== n.t) {
     renderText(el.querySelector('.body'), n.t || '');
     el._text = n.t;
@@ -163,7 +164,7 @@ function leave(el) {
   setTimeout(() => el.remove(), 200);
 }
 
-// Giữ các phần tử DOM khớp với store. Mảnh giấy nào đổi thì chỉ cập nhật đúng mảnh đó.
+// Keep the DOM elements in step with the store. Only the notes that changed are updated.
 export function createLayer(world, getSettings) {
   const els = new Map();
 

@@ -1,15 +1,18 @@
-// Gọi máy chủ cục bộ. Mọi request ghi đều kèm header X-Stick-Note để server từ chối trang web lạ.
+// Talking to the local server. Every write request carries an X-Stick-Note header so the server can reject foreign web pages.
 
 const WRITE_HEADERS = { 'X-Stick-Note': '1' };
 
+// Errors from the server look like { error: 'code', message: 'English explanation' }.
 async function check(res) {
   if (res.ok) return res;
-  let message = res.statusText || `Lỗi ${res.status}`;
+  let message = res.statusText || `Error ${res.status}`;
+  let code = '';
   try {
     const body = await res.json();
-    if (body && body.error) message = body.error;
-  } catch { /* không có nội dung JSON */ }
-  throw Object.assign(new Error(message), { status: res.status });
+    if (body && body.message) message = body.message;
+    if (body && body.error) code = body.error;
+  } catch { /* no JSON body */ }
+  throw Object.assign(new Error(message), { status: res.status, code });
 }
 
 export const imgUrl = (id) => `/img/${id}`;
@@ -25,7 +28,7 @@ export const api = {
     return (await res.json()).rev;
   },
 
-  // Trả về { conflict: false, rev } hoặc { conflict: true, rev, board } khi cửa sổ khác đã lưu trước.
+  // Resolves to { conflict: false, rev } or, when another window saved first, { conflict: true, rev, board }.
   async putBoard(baseRev, board, { keepalive = false } = {}) {
     const res = await fetch('/api/board', {
       method: 'PUT',
@@ -72,6 +75,12 @@ export const api = {
 
   async openDataFolder() {
     const res = await check(await fetch('/api/open-data-folder', { method: 'POST', headers: WRITE_HEADERS }));
+    return res.json();
+  },
+
+  // Ask the server to quit (used by "Quit Stick Note").
+  async shutdown() {
+    const res = await check(await fetch('/api/shutdown', { method: 'POST', headers: WRITE_HEADERS }));
     return res.json();
   },
 };

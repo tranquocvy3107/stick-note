@@ -1,6 +1,6 @@
 {
   "name": "stick-note",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "license": "MIT",
   "author": "tranquocvy3107",
@@ -12,8 +12,8 @@
   "bugs": {
     "url": "https://github.com/tranquocvy3107/stick-note/issues"
   },
-  "keywords": ["whiteboard", "sticky-notes", "notes", "local-first", "windows"],
-  "description": "Whiteboard giấy nhớ cá nhân: kéo mảnh giấy vào bảng, ghi chữ, link, ảnh rồi để nguyên đó.",
+  "keywords": ["whiteboard", "sticky-notes", "notes", "local-first", "offline", "windows", "linux"],
+  "description": "A personal whiteboard of sticky notes: drag a slip onto the board, write text, a link or an image, and leave it where it is.",
   "type": "module",
   "engines": {
     "node": ">=20.11"
@@ -21,6 +21,11 @@
   "scripts": {
     "start": "node server.js --open",
     "serve": "node server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "package:windows": "node tools/package/build-windows.mjs",
+    "package:linux": "node tools/package/build-linux.mjs",
+    "package:linux:wsl": "node tools/package/wsl.mjs all",
+    "package:checksums": "node tools/package/checksums.mjs",
+    "package:smoke": "node tools/package/smoke.mjs"
   }
 }

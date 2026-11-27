@@ -1,11 +1,12 @@
-# Chuẩn hóa xuống dòng. File .bat và .ps1 của Windows luôn dùng CRLF.
+# Normalise line endings. Windows .bat and .ps1 files must always use CRLF; shell scripts must use LF.
 * text=auto
 *.bat text eol=crlf
 *.ps1 text eol=crlf
+*.sh text eol=lf
 *.png binary
 *.ico binary
 
-# Những thứ này không đưa vào gói phát hành (git archive) vì người dùng cuối không cần.
+# Not needed by someone who just wants the source archive GitHub generates for a tag.
 /.github export-ignore
 /.gitattributes export-ignore
 /.gitignore export-ignore
@@ -14,4 +15,5 @@
 /test export-ignore
 /tools/icon-src export-ignore
 /tools/make-ico.mjs export-ignore
+/tools/package export-ignore
 /tools/release-notes.mjs export-ignore
