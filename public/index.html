@@ -15,9 +15,10 @@
   <!-- Every visible text below is English; js/i18n.js swaps it for the user's language at start-up
        (data-i18n* attributes name the keys in /locales/*.json). -->
   <main id="board" class="board" data-i18n-aria-label="board.label" aria-label="Notes board">
-    <div id="world"></div>
+    <div id="world"><div id="zones"></div></div>
   </main>
   <div id="marquee" class="marquee" hidden></div>
+  <div id="zdraw" class="zdraw" hidden></div>
 
   <div id="hint" class="hint" hidden>
     <div class="hint-card">
@@ -81,6 +82,8 @@
     <button type="button" class="pad" data-color="orange"></button>
     <button type="button" class="pad" data-color="purple"></button>
     <button type="button" class="pad" data-color="white"></button>
+    <span class="sep" aria-hidden="true"></span>
+    <button type="button" class="pad zonepad" data-zone="1" data-i18n-title="dock.zone" data-i18n-aria-label="dock.zoneLabel" title="Drag onto the board to draw a zone" aria-label="New zone"></button>
   </div>
 
   <button id="trash" class="trash" type="button" data-i18n-title="trash.button" data-i18n-aria-label="trash.label" title="Trash. Drag a note here to remove it." aria-label="Trash">

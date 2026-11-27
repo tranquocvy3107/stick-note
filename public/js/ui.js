@@ -56,7 +56,8 @@ export function createUI({ board, view, layer, settings, onTiltChange }) {
   // ------------------------------------------------------------ texts that need parameters
 
   // The tray slips are plain buttons in the HTML; their labels name the colour, so they are filled in here.
-  for (const pad of $('#dock').querySelectorAll('.pad')) {
+  // (The zone tile has no colour and is labelled in the HTML.)
+  for (const pad of $('#dock').querySelectorAll('.pad[data-color]')) {
     const color = t(`color.${pad.dataset.color}`).toLocaleLowerCase(getLanguage());
     pad.title = t('dock.pad', { color });
     pad.setAttribute('aria-label', t('dock.padLabel', { color }));
@@ -155,6 +156,7 @@ export function createUI({ board, view, layer, settings, onTiltChange }) {
       const n = store.state.notes.get(id);
       if (n) rects.push({ x: n.x, y: n.y, w: n.w, h: el.offsetHeight });
     }
+    for (const z of store.state.zones.values()) rects.push({ x: z.x, y: z.y, w: z.w, h: z.h });
     if (!rects.length) {
       view.home();
       return;
@@ -282,7 +284,7 @@ export function createUI({ board, view, layer, settings, onTiltChange }) {
     menuBtn.setAttribute('aria-expanded', String(show));
     if (show) {
       const s = store.state;
-      const counts = t('menu.foot', { count: s.notes.size, trash: s.trash.length });
+      const counts = t('menu.foot', { count: s.notes.size, trash: s.trash.length + s.zonesTrash.length });
       $('#menu-foot').textContent = appVersion ? `${counts} · v${appVersion}` : counts;
       syncMenuState();
     }
@@ -407,8 +409,30 @@ export function createUI({ board, view, layer, settings, onTiltChange }) {
     return row;
   }
 
+  // A deleted zone: only its name and kind are worth showing. The notes that were inside never left the board.
+  function zoneTrashRow(z) {
+    const name = z.t || t(`zone.kind.${z.k}`);
+    const row = h('div', { class: 'tr-item zrow', dataset: { kind: z.k } },
+      h('div', { class: 'tr-body' },
+        h('div', { class: 'tr-text' }, icon('zone', 15), t('trash.zone', { name })),
+        h('div', { class: 'tr-meta' }, t('trash.deleted', { when: timeAgo(z.del || z.mt, timeOptions()) })),
+      ),
+      h('div', { class: 'tr-actions' },
+        h('button', { type: 'button', class: 'btn small', onclick: () => restoreZone(z.id) }, icon('restore', 15), t('trash.restore')),
+      ),
+    );
+    const purge = h('button', { type: 'button', class: 'btn small ghost-danger' }, t('trash.purge'));
+    twoStep(purge, t('trash.sure'), () => store.purgeTrash([z.id]));
+    row.querySelector('.tr-actions').append(purge);
+    return row;
+  }
+
   function renderTrash() {
-    const items = [...store.state.trash].sort((a, b) => (b.del || 0) - (a.del || 0));
+    // Notes and zones share one trash, newest deletion first.
+    const items = [
+      ...store.state.trash.map((item) => ({ item, zone: false })),
+      ...store.state.zonesTrash.map((item) => ({ item, zone: true })),
+    ].sort((a, b) => (b.item.del || 0) - (a.item.del || 0));
     badge.hidden = items.length === 0;
     badge.textContent = items.length > 99 ? '99+' : String(items.length);
     $('#drawer-empty').hidden = items.length === 0;
@@ -417,9 +441,18 @@ export function createUI({ board, view, layer, settings, onTiltChange }) {
       list.replaceChildren(h('p', { class: 'drawer-empty-note' }, t('trash.isEmpty')));
       return;
     }
-    list.replaceChildren(...items.map(trashRow));
+    list.replaceChildren(...items.map(({ item, zone }) => (zone ? zoneTrashRow(item) : trashRow(item))));
   }
   store.on('trash', renderTrash);
+
+  function restoreZone(id) {
+    store.checkpoint();
+    const z = store.restoreZone(id);
+    if (!z) return;
+    view.ensureVisible({ x: z.x, y: z.y, w: z.w, h: z.h });
+    inter?.zones.select(z.id);
+    toast(t('trash.zoneRestored'), { action: t('common.undo'), run: () => inter?.undo() });
+  }
 
   function restore(id) {
     store.checkpoint();
@@ -500,6 +533,7 @@ export function createUI({ board, view, layer, settings, onTiltChange }) {
 
   return {
     marqueeEl: $('#marquee'),
+    zoneDrawEl: $('#zdraw'),
     toast,
     setTrash,
     overTrash,

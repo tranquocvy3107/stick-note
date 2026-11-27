@@ -4,6 +4,7 @@ import * as store from './store.js';
 import { api } from './api.js';
 import { createView } from './view.js';
 import { createLayer } from './noteview.js';
+import { createZoneLayer } from './zoneview.js';
 import { createInteractions } from './interactions.js';
 import { createCapture } from './capture.js';
 import { createUI, loadSettings } from './ui.js';
@@ -35,8 +36,9 @@ async function boot() {
   let ui;
   const view = createView(board, world, { isBlocked: () => ui.blocking() });
   const layer = createLayer(world, () => settings);
+  const zoneLayer = createZoneLayer(document.getElementById('zones'), layer, view);
   ui = createUI({ board, view, layer, settings, onTiltChange: () => layer.syncAll() });
-  const inter = createInteractions({ board, world, view, layer, ui });
+  const inter = createInteractions({ board, world, view, layer, zoneLayer, ui });
   const capture = createCapture({ board, view, layer, inter, ui, dockEl: document.getElementById('dock') });
   inter.setCapture(capture);
   ui.bind(inter);
@@ -80,7 +82,7 @@ async function boot() {
   window.addEventListener('pagehide', () => store.flushOnExit());
 
   // For testing and debugging in the Console: window.stickNote
-  window.stickNote = { store, view, layer, inter, ui, capture };
+  window.stickNote = { store, view, layer, zoneLayer, inter, ui, capture };
 }
 
 boot().catch((err) => {

@@ -1,11 +1,12 @@
-// The data store: notes, trash, undo/redo and autosave.
+// The data store: notes, zones, trash, undo/redo and autosave.
 //
 // Every change goes through the functions in this file so that they always: update `mt`
 // (the last-modified time, used when merging), mark the board "unsaved", and emit an event for the UI to redraw.
 //
 // Events:
 //   'notes'  { changed?: id[], removed?: id[], reset?: true }
-//   'trash'  (the trash changed)
+//   'zones'  { changed?: id[], removed?: id[], reset?: true }
+//   'trash'  (the trash changed: it holds both notes and zones)
 //   'status' 'loading' | 'saved' | 'pending' | 'saving' | 'error'
 //   'merged' (changes from another window were just merged in)
 
@@ -13,6 +14,7 @@ import { api } from './api.js';
 import { mergeBoards } from './merge.js';
 import { uid, clamp, round } from './util.js';
 import { COLOR_KEYS, NOTE_W, MIN_W, MAX_W, TRASH_KEEP_DAYS } from './constants.js';
+import { normalizeZone } from './zones.js';
 
 const listeners = {};
 export function on(evt, fn) {
@@ -28,6 +30,8 @@ function emit(evt, data) {
 export const state = {
   notes: new Map(),
   trash: [],
+  zones: new Map(),
+  zonesTrash: [],
   zmax: 1,
   rev: 0,
   status: 'loading',
@@ -35,6 +39,7 @@ export const state = {
 };
 
 export const getNote = (id) => state.notes.get(id);
+export const getZone = (id) => state.zones.get(id);
 
 // ---------------------------------------------------------------- normalising
 
@@ -81,7 +86,19 @@ function compact(n) {
   return o;
 }
 
-function setData(notes, trash) {
+// Same idea for zones: leave out fields that hold their default value, round the geometry.
+function compactZone(z) {
+  const o = { ...z };
+  if (!o.p) delete o.p;
+  if (!o.t) delete o.t;
+  o.x = round(o.x, 1);
+  o.y = round(o.y, 1);
+  o.w = round(o.w, 0);
+  o.h = round(o.h, 0);
+  return o;
+}
+
+function setData(notes, trash, zones = [], zonesTrash = []) {
   state.notes = new Map();
   let zmax = 1;
   for (const raw of notes) {
@@ -97,13 +114,38 @@ function setData(notes, trash) {
     if (!n.del) n.del = n.mt;
     state.trash.push(n);
   }
+  state.zones = new Map();
+  for (const raw of zones) {
+    if (!raw || raw.id == null) continue;
+    const z = normalizeZone(raw);
+    state.zones.set(z.id, z);
+  }
+  state.zonesTrash = [];
+  for (const raw of zonesTrash) {
+    if (!raw || raw.id == null) continue;
+    const z = normalizeZone(raw);
+    if (!z.del) z.del = z.mt;
+    state.zonesTrash.push(z);
+  }
   state.zmax = zmax;
+}
+
+// Replace everything with a board as it comes from the server, a merge or a backup copy.
+const applyBoard = (b) => setData(b.notes || [], b.trash || [], b.zones || [], b.zonesTrash || []);
+
+// Tell every listener that all notes, zones and the trash were replaced.
+function emitReset() {
+  emit('notes', { reset: true });
+  emit('zones', { reset: true });
+  emit('trash');
 }
 
 export function serialize() {
   return {
     notes: [...state.notes.values()].map(compact),
     trash: state.trash.map(compact),
+    zones: [...state.zones.values()].map(compactZone),
+    zonesTrash: state.zonesTrash.map(compactZone),
   };
 }
 
@@ -160,13 +202,12 @@ export async function flush() {
   try {
     const res = await api.putBoard(state.rev, serialize());
     if (res.conflict) {
-      // Another window saved first: merge note by note, then save the merged board.
+      // Another window saved first: merge item by item (notes and zones), then save the merged board.
       const merged = mergeBoards(serialize(), res.board);
       state.rev = res.rev;
-      setData(merged.notes, merged.trash);
+      applyBoard(merged);
       dirty = true;
-      emit('notes', { reset: true });
-      emit('trash');
+      emitReset();
       emit('merged');
     } else {
       state.rev = res.rev;
@@ -206,9 +247,12 @@ export const isDirty = () => dirty || saving;
 
 function purgeOldTrash() {
   const cutoff = Date.now() - TRASH_KEEP_DAYS * 86_400_000;
-  const keep = state.trash.filter((n) => (n.del || n.mt) >= cutoff);
-  if (keep.length !== state.trash.length) {
+  const fresh = (item) => (item.del || item.mt) >= cutoff;
+  const keep = state.trash.filter(fresh);
+  const keepZones = state.zonesTrash.filter(fresh);
+  if (keep.length !== state.trash.length || keepZones.length !== state.zonesTrash.length) {
     state.trash = keep;
+    state.zonesTrash = keepZones;
     touch();
   }
 }
@@ -217,21 +261,19 @@ export async function load() {
   setStatus('loading');
   const { rev, board } = await api.getBoard();
   state.rev = rev;
-  setData(board.notes || [], board.trash || []);
+  applyBoard(board);
 
   // The last window closed before it could save (or the server was down): merge the unsaved work back in.
   const pending = readPending();
   if (pending && pending.board && Date.now() - (pending.at || 0) < 30 * 86_400_000) {
-    const merged = mergeBoards(pending.board, serialize());
-    setData(merged.notes, merged.trash);
+    applyBoard(mergeBoards(pending.board, serialize()));
     dirty = true;
     schedule(200);
   }
   clearPending();
   purgeOldTrash();
   setStatus(dirty ? 'pending' : 'saved');
-  emit('notes', { reset: true });
-  emit('trash');
+  emitReset();
 }
 
 // When the window regains focus: if another window saved changes, load the newer board.
@@ -243,9 +285,8 @@ export async function checkRemote() {
     const res = await api.getBoard();
     if (dirty || saving) return;
     state.rev = res.rev;
-    setData(res.board.notes || [], res.board.trash || []);
-    emit('notes', { reset: true });
-    emit('trash');
+    applyBoard(res.board);
+    emitReset();
   } catch { /* offline: the next save will report it */ }
 }
 
@@ -268,6 +309,8 @@ function fingerprints() {
   const map = new Map();
   for (const n of state.notes.values()) map.set(n.id, JSON.stringify(compact(n)));
   for (const n of state.trash) map.set(n.id, JSON.stringify(compact(n)));
+  for (const z of state.zones.values()) map.set(z.id, JSON.stringify(compactZone(z)));
+  for (const z of state.zonesTrash) map.set(z.id, JSON.stringify(compactZone(z)));
   return map;
 }
 
@@ -275,18 +318,17 @@ function travel(from, to) {
   if (!from.length) return false;
   to.push(snapshot());
   const before = fingerprints();
-  const data = JSON.parse(from.pop());
-  setData(data.notes, data.trash);
-  // A note that just returned to an earlier state counts as freshly edited, so it wins when merged with another window.
+  applyBoard(JSON.parse(from.pop()));
+  // An item that just returned to an earlier state counts as freshly edited, so it wins when merged with another window.
   const now = Date.now();
   for (const [id, fp] of fingerprints()) {
     if (before.get(id) === fp) continue;
-    const n = state.notes.get(id) || state.trash.find((t) => t.id === id);
-    if (n) n.mt = now;
+    const item = state.notes.get(id) || state.trash.find((t) => t.id === id)
+      || state.zones.get(id) || state.zonesTrash.find((t) => t.id === id);
+    if (item) item.mt = now;
   }
   touch();
-  emit('notes', { reset: true });
-  emit('trash');
+  emitReset();
   return true;
 }
 export const undo = () => travel(undoStack, redoStack);
@@ -393,12 +435,96 @@ export function restoreNote(id) {
   return n;
 }
 
-// ids = undefined: empty the whole trash.
+// ids = undefined: empty the whole trash (notes and zones alike).
 export function purgeTrash(ids) {
-  const before = state.trash.length;
+  const before = state.trash.length + state.zonesTrash.length;
   state.trash = ids ? state.trash.filter((n) => !ids.includes(n.id)) : [];
-  if (state.trash.length !== before) {
+  state.zonesTrash = ids ? state.zonesTrash.filter((z) => !ids.includes(z.id)) : [];
+  if (state.trash.length + state.zonesTrash.length !== before) {
     touch();
     emit('trash');
   }
+}
+
+// ---------------------------------------------------------------- zones
+
+export function addZone(fields) {
+  const now = Date.now();
+  const z = normalizeZone({ k: 'normal', ...fields, id: uid('z'), ts: now, mt: now }, now);
+  state.zones.set(z.id, z);
+  touch();
+  emit('zones', { changed: [z.id] });
+  return z;
+}
+
+// patch: an object, or a function (zone) => object. Every value is checked again (minimum size, known kind, label length).
+export function updateZones(ids, patch) {
+  const now = Date.now();
+  const changed = [];
+  for (const id of ids) {
+    const z = state.zones.get(id);
+    if (!z) continue;
+    state.zones.set(id, normalizeZone({ ...z, ...(typeof patch === 'function' ? patch(z) : patch), mt: now }, now));
+    changed.push(id);
+  }
+  if (changed.length) {
+    touch();
+    emit('zones', { changed });
+  }
+}
+
+// positions: Map<id, { x, y }>. Moving a zone together with its notes is two calls inside one undo step.
+export function moveZones(positions) {
+  const now = Date.now();
+  const changed = [];
+  for (const [id, p] of positions) {
+    const z = state.zones.get(id);
+    if (!z) continue;
+    z.x = round(p.x, 1);
+    z.y = round(p.y, 1);
+    z.mt = now;
+    changed.push(id);
+  }
+  if (changed.length) {
+    touch();
+    emit('zones', { changed });
+  }
+}
+
+// Move to the trash (can be restored). The notes inside a zone are never touched.
+export function removeZones(ids) {
+  const now = Date.now();
+  const removed = [];
+  for (const id of ids) {
+    const z = state.zones.get(id);
+    if (!z) continue;
+    state.zones.delete(id);
+    state.zonesTrash.push({ ...z, del: now, mt: now });
+    removed.push(id);
+  }
+  if (removed.length) {
+    touch();
+    emit('zones', { removed });
+    emit('trash');
+  }
+}
+
+// Delete outright, bypassing the trash. Only used for a zone that was drawn and immediately thrown away.
+export function discardZone(id) {
+  if (!state.zones.delete(id)) return;
+  touch();
+  emit('zones', { removed: [id] });
+}
+
+export function restoreZone(id) {
+  const i = state.zonesTrash.findIndex((z) => z.id === id);
+  if (i < 0) return null;
+  const [z] = state.zonesTrash.splice(i, 1);
+  delete z.del;
+  z.mt = Date.now();
+  state.zones.set(z.id, z);
+  touch();
+  emit('zones', { changed: [z.id] });
+  emit('trash');
+  return z;
 }

@@ -27,6 +27,10 @@ const PATHS = {
   tilt: '<rect x="5" y="6" width="14" height="12" rx="1.5" transform="rotate(-8 12 12)"/>',
   globe: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
   power: '<path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/>',
+  lock: '<rect x="3.5" y="11" width="17" height="10.5" rx="2.2"/><path d="M7.5 11V7.5a4.5 4.5 0 0 1 9 0V11"/>',
+  eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+  eyeoff: '<path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c6.4 0 10 8 10 8a13.2 13.2 0 0 1-1.7 2.7"/><path d="M6.6 6.6A13.5 13.5 0 0 0 2 12s3.6 8 10 8a9.7 9.7 0 0 0 5.4-1.6"/><path d="M14.1 14.1a3 3 0 1 1-4.2-4.2"/><path d="m2 2 20 20"/>',
+  zone: '<rect x="3" y="5" width="18" height="14" rx="3.2" stroke-dasharray="3.2 3.2"/>',
 };
 
 const cache = new Map();

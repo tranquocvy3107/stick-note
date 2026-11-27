@@ -3,6 +3,22 @@
 All notable changes to this project are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the version numbers follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+Zones: sort a busy board by drawing labelled areas on it.
+
+### Added
+
+- **Zones.** Labelled rectangles behind the notes, in three kinds: *Important*, *Normal* and *Low priority* (its notes fade so clutter recedes). Any zone can also be *Private*: its notes are blurred until you click them (the lock on the zone's tab shows or hides them all). A zone is only a frame: nothing inside it is ever moved, sorted or aligned for you.
+- Draw a zone by pressing and holding on an empty spot for half a second and then dragging (a quick drag still moves the board). Other ways: the `Z` key, the dashed tile in the tray, or `G` to wrap the selected notes.
+- Drag a zone's name tab to move it together with the notes whose middle is inside it, and with the zones inside it (pinned notes stay where they are). Drag an edge or corner to resize; double-click the tab, or press `Enter` or `F2`, to rename.
+- Deleted zones go to the trash with the notes' trash (restorable for 60 days) and `Ctrl+Z` undoes every zone change. Zones are merged between windows like notes.
+- "Show all notes" (`Shift+1`) includes the zones.
+
+### Changed
+
+- The board file gains two optional lists, `zones` and `zonesTrash`. Files from 1.1 open unchanged. The server keeps the zones when a window that does not know about them saves.
+
 ## [1.1.0] - 2026-11-27
 
 Easy to install on Windows and Linux, available in English and Vietnamese, and open to contributors.
@@ -43,5 +59,6 @@ The first release.
 - Automatic saving into the `data/` folder (JSON file and images), a backup every day, automatic recovery from a damaged file, merging when several windows are open, and unsaved notes kept in the window if the server stops unexpectedly.
 - Opens as its own app window with `start.bat`, a script that creates a desktop shortcut, and a background server that quits by itself when the window is closed.
 
+[Unreleased]: https://github.com/tranquocvy3107/stick-note/compare/v1.1.0...HEAD
 [1.1.0]: https://github.com/tranquocvy3107/stick-note/releases/tag/v1.1.0
 [1.0.0]: https://github.com/tranquocvy3107/stick-note/releases/tag/v1.0.0
