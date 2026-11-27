@@ -3,6 +3,20 @@
 All notable changes to this project are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the version numbers follow [Semantic Versioning](https://semver.org/).
 
+## [1.2.1] - 2026-11-27
+
+Fixes a window losing its connection to the server, and records the project's new address.
+
+### Fixed
+
+- **"Lost connection to the server" after leaving the window alone.** The background server used to quit when the window had not reported in for 5 minutes. A browser can freeze or slow down a window that is minimised or hidden, so the server took a window that was only resting for a closed one and shut down, and the window showed the red "Lost connection" bar when you came back. Each window now says goodbye when it really closes, and the server only quits after that: a window that is merely quiet is never counted as closed. If the server ever does stop, the window still keeps your notes and saves them as soon as you open Stick Note again from its shortcut.
+
+### Changed
+
+- The project moved to https://github.com/vytk712025main-eng/stick-note. The old address redirects there. Links, issue templates and release notes now use the new address.
+- **Checking a download** (optional): releases up to 1.2.0 were built before the move and can be verified with `gh attestation verify <file> --owner tranquocvy3107`. This and later releases use `gh attestation verify <file> --repo vytk712025main-eng/stick-note`. The checksums in `SHA256SUMS.txt` work for every release.
+- `/api/info` also reports how many windows are open.
+
 ## [1.2.0] - 2026-11-27
 
 Zones: sort a busy board by drawing labelled areas on it.
@@ -59,6 +73,7 @@ The first release.
 - Automatic saving into the `data/` folder (JSON file and images), a backup every day, automatic recovery from a damaged file, merging when several windows are open, and unsaved notes kept in the window if the server stops unexpectedly.
 - Opens as its own app window with `start.bat`, a script that creates a desktop shortcut, and a background server that quits by itself when the window is closed.
 
+[1.2.1]: https://github.com/vytk712025main-eng/stick-note/releases/tag/v1.2.1
 [1.2.0]: https://github.com/vytk712025main-eng/stick-note/releases/tag/v1.2.0
 [1.1.0]: https://github.com/vytk712025main-eng/stick-note/releases/tag/v1.1.0
 [1.0.0]: https://github.com/vytk712025main-eng/stick-note/releases/tag/v1.0.0
