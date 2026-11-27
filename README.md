@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/vytk712025main-eng/stick-note/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/tranquocvy3107/stick-note"></a>
+  <a href="https://github.com/vytk712025main-eng/stick-note/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/vytk712025main-eng/stick-note"></a>
   <a href="https://github.com/vytk712025main-eng/stick-note/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/vytk712025main-eng/stick-note/actions/workflows/ci.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green"></a>
 </p>
@@ -39,7 +39,7 @@ Then open **Stick Note** from your Start menu, desktop or applications menu.
 <details>
 <summary><b>Windows says "Windows protected your PC"</b></summary>
 
-That message appears for every new app that is not code-signed yet (certificates cost money). Click **More info**, then **Run anyway**. If you want to check the download first, compare its SHA-256 with `SHA256SUMS.txt` on the release page, or run `gh attestation verify <file> --repo tranquocvy3107/stick-note` to prove it was built by this repository.
+That message appears for every new app that is not code-signed yet (certificates cost money). Click **More info**, then **Run anyway**. If you want to check the download first, compare its SHA-256 with `SHA256SUMS.txt` on the release page, or run `gh attestation verify <file> --repo vytk712025main-eng/stick-note` to prove it was built by this repository. For versions up to 1.2.0 (built before the project moved here) use `--owner tranquocvy3107` instead of `--repo vytk712025main-eng/stick-note`.
 </details>
 
 <details>
