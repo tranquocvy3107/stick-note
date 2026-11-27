@@ -154,6 +154,46 @@ test('mergeBoards: on a tie the trash wins (a deleted note is never resurrected)
 });
 
 test('mergeBoards: tolerates missing data', () => {
-  assert.deepEqual(mergeBoards({}, undefined), { notes: [], trash: [] });
+  assert.deepEqual(mergeBoards({}, undefined), { notes: [], trash: [], zones: [], zonesTrash: [] });
   assert.deepEqual(ids(mergeBoards({ notes: [note('a', 1)] }, null).notes), ['a']);
+});
+
+// Zones follow the same rules as notes, in their own lists.
+const zoneItem = (id, mt, extra = {}) => ({ id, x: 0, y: 0, w: 300, h: 200, k: 'normal', t: id, mt, ...extra });
+
+test('mergeBoards: zones are merged like notes (later edit wins, later delete trashes, one-sided zones are kept)', () => {
+  const merged = mergeBoards(
+    {
+      notes: [], trash: [],
+      zones: [zoneItem('moved', 10, { x: 100 }), zoneItem('local-only', 1), zoneItem('doomed', 5)],
+      zonesTrash: [],
+    },
+    {
+      notes: [], trash: [],
+      zones: [zoneItem('moved', 5, { x: 50 }), zoneItem('remote-only', 2)],
+      zonesTrash: [zoneItem('doomed', 9, { del: 9 })],
+    },
+  );
+  const byId = Object.fromEntries(merged.zones.map((z) => [z.id, z]));
+  assert.deepEqual(ids(merged.zones), ['local-only', 'moved', 'remote-only']);
+  assert.equal(byId.moved.x, 100, 'the local copy is newer');
+  assert.deepEqual(ids(merged.zonesTrash), ['doomed'], 'the later delete wins');
+});
+
+test('mergeBoards: notes and zones never mix, even with the same id', () => {
+  const merged = mergeBoards(
+    { notes: [note('same', 5)], zones: [zoneItem('same', 5)] },
+    { notes: [], trash: [note('same', 9, { del: 9 })], zones: [], zonesTrash: [] },
+  );
+  assert.deepEqual(ids(merged.notes), [], 'the note was trashed later');
+  assert.deepEqual(ids(merged.trash), ['same']);
+  assert.deepEqual(ids(merged.zones), ['same'], 'the zone with the same id is unaffected');
+  assert.deepEqual(merged.zonesTrash, []);
+});
+
+test('mergeBoards: a board from before zones existed merges cleanly with one that has zones', () => {
+  const old = { notes: [note('a', 1)], trash: [] }; // 1.1: no zones fields at all
+  const fresh = { notes: [note('a', 1)], trash: [], zones: [zoneItem('z', 3)], zonesTrash: [] };
+  assert.deepEqual(ids(mergeBoards(old, fresh).zones), ['z']);
+  assert.deepEqual(ids(mergeBoards(fresh, old).zones), ['z']);
 });

@@ -14,11 +14,12 @@
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green"></a>
 </p>
 
-![Stick Note: colourful paper notes spread over one big whiteboard](docs/screenshot-light.png)
+![Stick Note: colourful paper notes spread over one big whiteboard, grouped in labelled zones](docs/screenshot-light.png)
 
 Stick Note is a private notes app with **one screen**: a big, endless whiteboard. Drag a paper slip onto it, type a thought or paste a link, and leave it there. No folders, no tags, no lists. **Where you put a note is how you find it again.**
 
 - **Quick.** Drag a slip, double-click anywhere, or press `Ctrl+V` to turn text, links and screenshots into notes.
+- **Zones.** When the board gets busy, draw a labelled area around some notes: *Important*, *Normal*, *Low priority* (its notes fade into the background) or *Private* (its notes are blurred until you click them). Nothing is ever moved or sorted for you.
 - **Yours alone.** Everything stays on your computer. No account, no cloud, no tracking. Works offline.
 - **Safe.** Saves as you type, makes a backup every day, and keeps deleted notes in a trash for 60 days.
 - **Light.** Opens instantly and stays smooth (tested with 1,500+ notes). Available in English and Tiếng Việt.
@@ -77,6 +78,8 @@ If you keep running it from that folder, nothing changes: your notes stay in its
 | Come back | `Home` returns to the start. `Shift+1` shows every note. |
 | Search | `Ctrl+F` or `/`. Matching notes light up and nothing moves. Accents are ignored. |
 | Keep a note in place | Click its pin icon to lock its position. |
+| Draw a zone | Press and hold on an empty spot for half a second, then drag. (A quick drag still moves the board.) Or press `Z`, drag the dashed tile from the tray, or select some notes and press `G` to put a zone around them. |
+| Change a zone | Click its name tab: pick *Important*, *Normal* or *Low priority*, make it *Private*, or delete it. Drag the tab to move the zone together with the notes inside it (pinned notes stay), drag an edge or corner to resize, double-click the tab to rename. |
 | Delete | Press `Delete` or drag it onto the trash can. The trash keeps notes for 60 days. |
 | Undo | `Ctrl+Z` and `Ctrl+Y`. |
 | Select several | `Shift` + drag on the background, `Shift` + click, or `Ctrl+A`. |
@@ -90,6 +93,7 @@ Press `?` inside the app for the full list. Quit with Menu, **Quit Stick Note** 
 - The folder holds `board.json` (your notes), `images/`, `backups/` (one backup per day, plus an extra one if many notes disappear suddenly) and `server.log`. Copy the folder to back up or move.
 - Stick Note talks only to your own computer (`127.0.0.1`). It sends nothing anywhere.
 - **Notes are stored as ordinary files and are not encrypted yet.** Encryption is on the [roadmap](#roadmap). Until then, do not keep secrets in it unless your disk is encrypted (BitLocker on Windows, LUKS on Linux).
+- A *Private* zone only **hides its notes from someone glancing at your screen**. It does not encrypt anything: search still finds those notes and copying still copies their text.
 
 ## Something wrong?
 
@@ -121,8 +125,7 @@ node server.js --open   # start it and open the app window (also: ./start.sh, st
 
 ## Roadmap
 
-- **Zones:** draw labelled areas on the board (important, low priority, private...) and move them with their notes.
-- **A vault for sensitive notes:** encryption with a passphrase, private zones, version history, and backup and restore tools.
+- **A vault for sensitive notes:** encryption with a passphrase, private zones that also stay out of search and the clipboard, version history, and backup and restore tools.
 - **macOS** builds.
 
 ## License

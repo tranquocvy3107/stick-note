@@ -1,6 +1,7 @@
 // Shared helpers. Nothing here touches the DOM at import time, so it can be tested in Node.
 
-export const uid = () => 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+// A short unique id. Notes start with "n" and zones with "z", so an id tells you what it names.
+export const uid = (prefix = 'n') => prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 export const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 export const rand = (lo, hi) => lo + Math.random() * (hi - lo);
 export const round = (v, digits = 0) => {

@@ -6,7 +6,7 @@
 
 import * as store from './store.js';
 import { h, rand, round, isTextField } from './util.js';
-import { NOTE_W, NOTE_H } from './constants.js';
+import { NOTE_W, NOTE_H, ZONE_SCREEN_W, ZONE_SCREEN_H } from './constants.js';
 import { storeImage, isImageFile } from './image.js';
 import { t } from './i18n.js';
 
@@ -197,18 +197,23 @@ export function createCapture({ board, view, layer, inter, ui, dockEl }) {
 
   // ------------------------------------------------------------ the note tray
 
+  // The tray holds the paper slips and, after a divider, a dashed tile for zones. Both are dragged onto the board the
+  // same way; a slip makes a note, the tile draws a zone about as big as it looks on screen.
   function beginDockDrag(e, pad) {
     if (e.button !== 0) return;
     e.preventDefault();
     inter.endEdit();
     ui.closePopovers();
 
+    const isZone = 'zone' in pad.dataset;
     const color = pad.dataset.color;
-    const r = tilt();
-    const scale = view.v.z;
-    const ghost = h('div', { class: 'note ghost', dataset: { color } });
-    ghost.style.width = `${NOTE_W}px`;
-    ghost.style.minHeight = `${NOTE_H}px`;
+    const r = isZone ? 0 : tilt();
+    const scale = isZone ? 1 : view.v.z;
+    const gw = isZone ? ZONE_SCREEN_W : NOTE_W; // size of the ghost, in screen px at scale 1
+    const gh = isZone ? ZONE_SCREEN_H : NOTE_H;
+    const ghost = isZone ? h('div', { class: 'zone-ghost' }) : h('div', { class: 'note ghost', dataset: { color } });
+    ghost.style.width = `${gw}px`;
+    ghost.style[isZone ? 'height' : 'minHeight'] = `${gh}px`;
     ghost.hidden = true;
     document.body.append(ghost);
 
@@ -217,7 +222,7 @@ export function createCapture({ board, view, layer, inter, ui, dockEl }) {
     try { pad.setPointerCapture(e.pointerId); } catch { /* ignore */ }
 
     const place = (x, y) => {
-      ghost.style.transform = `translate(${x - NOTE_W / 2}px, ${y - NOTE_H / 2}px) scale(${scale}) rotate(${r}deg)`;
+      ghost.style.transform = `translate(${x - gw / 2}px, ${y - gh / 2}px) scale(${scale}) rotate(${r}deg)`;
     };
     const onMove = (ev) => {
       if (!moved && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) > 6) {
@@ -237,13 +242,16 @@ export function createCapture({ board, view, layer, inter, ui, dockEl }) {
     const onUp = (ev) => {
       cleanup();
       if (!moved) {
-        createAtCenter(color); // clicked without dragging: place it in the middle of the screen
+        // clicked without dragging: place it in the middle of the screen
+        if (isZone) inter.zones.createAtCenter();
+        else createAtCenter(color);
         return;
       }
       const under = document.elementFromPoint(ev.clientX, ev.clientY);
       if (!under || !board.contains(under)) return; // dropped on a toolbar or outside the board: cancel
       const p = view.toWorld(ev.clientX, ev.clientY);
-      createBlank({ cx: p.x, cy: p.y, color, r, exact: true });
+      if (isZone) inter.zones.createAt(p.x, p.y);
+      else createBlank({ cx: p.x, cy: p.y, color, r, exact: true });
     };
     const onKey = (ev) => {
       if (ev.key === 'Escape') {
@@ -259,9 +267,11 @@ export function createCapture({ board, view, layer, inter, ui, dockEl }) {
 
   for (const pad of dockEl.querySelectorAll('.pad')) {
     pad.addEventListener('pointerdown', (e) => beginDockDrag(e, pad));
-    // Enter/Space on the button (keyboard): place the note in the middle of the screen.
+    // Enter/Space on the button (keyboard): place the note (or zone) in the middle of the screen.
     pad.addEventListener('click', (e) => {
-      if (e.detail === 0) createAtCenter(pad.dataset.color);
+      if (e.detail !== 0) return;
+      if ('zone' in pad.dataset) inter.zones.createAtCenter();
+      else createAtCenter(pad.dataset.color);
     });
   }
 

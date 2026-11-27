@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LANGUAGES, createTranslator, pickLanguage } from '../public/js/i18n.js';
-import { COLOR_KEYS, HELP_SECTIONS } from '../public/js/constants.js';
+import { COLOR_KEYS, HELP_SECTIONS, ZONE_KINDS } from '../public/js/constants.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const readJson = (file) => JSON.parse(fs.readFileSync(path.join(ROOT, file), 'utf8'));
@@ -107,6 +107,7 @@ test('every message key used in the code and in index.html exists in en.json', (
 
   // Keys built at run time.
   for (const c of COLOR_KEYS) used.set(`color.${c}`, 'color palette');
+  for (const k of ZONE_KINDS) used.set(`zone.kind.${k}`, 'zone kinds');
   for (const theme of ['auto', 'light', 'dark']) used.set(`theme.${theme}`, 'theme menu');
   for (const s of HELP_SECTIONS) {
     used.set(s.title, 'help dialog');

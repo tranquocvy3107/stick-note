@@ -2,19 +2,21 @@
 //
 // How it works: mouse and touch gestures (dragging a note, dragging the background, area select, resize,
 // two-finger pinch) are each one "gesture" at a time. While dragging we only change the DOM, to stay smooth;
-// the store is written once on release (one undo step).
+// the store is written once on release (one undo step). Zones have their own file (zoneinteractions.js) that
+// borrows the gesture machinery from here.
 
 import * as store from './store.js';
 import { clamp, isTextField, readingOrder, writeClipboardText } from './util.js';
-import { MIN_W, MAX_W, NOTE_H } from './constants.js';
+import { MIN_W, MAX_W, NOTE_H, ZONE_HOLD_MS } from './constants.js';
 import { imgUrl } from './api.js';
 import { placeAt } from './noteview.js';
 import { toPngBlob } from './image.js';
+import { createZoneInteractions } from './zoneinteractions.js';
 import { t } from './i18n.js';
 
 const DRAG_THRESHOLD = 4; // px: moving less than this still counts as a click, so clicking a link never drags by accident
 
-export function createInteractions({ board, world, view, layer, ui }) {
+export function createInteractions({ board, world, view, layer, zoneLayer, ui }) {
   const { state } = store;
   const selection = new Set();
   const pointers = new Map();
@@ -29,6 +31,22 @@ export function createInteractions({ board, world, view, layer, ui }) {
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   const selected = () => [...selection];
 
+  const zi = createZoneInteractions({
+    board, view, layer, zoneLayer, ui,
+    tools: {
+      setGesture: (g) => { gesture = g; },
+      capturePointer: (id) => capturePointer(id),
+      releasePointer: (id) => releasePointer(id),
+      endEdit: () => endEdit(),
+      clearNotes: () => setSelection([]),
+      noteIds: () => selected(),
+      isDoubleTap: (e, key) => isDoubleTap(e, key),
+      suppressClick: (ms) => { suppressClickUntil = performance.now() + ms; },
+      lastPointer: () => lastPointer,
+      undo: () => undo(),
+    },
+  });
+
   // ------------------------------------------------------------ selection
 
   // The toolbar sits above a note. If the note is close to the top or left edge of the screen,
@@ -41,6 +59,11 @@ export function createInteractions({ board, world, view, layer, ui }) {
 
   function setSelection(ids) {
     const next = new Set(ids.filter((id) => state.notes.has(id)));
+    if (next.size) {
+      // Notes and zones are never selected together.
+      zi.endLabelEdit();
+      zoneLayer.setSelected(null);
+    }
     for (const id of selection) if (!next.has(id)) layer.get(id)?.classList.remove('sel');
     for (const id of next) {
       const el = layer.get(id);
@@ -94,6 +117,7 @@ export function createInteractions({ board, world, view, layer, ui }) {
     }
     endEdit();
     setSelection([id]);
+    zoneLayer.revealNote(id); // writing in a note inside a private zone shows it
 
     const ta = document.createElement('textarea');
     ta.className = 'editor';
@@ -224,6 +248,7 @@ export function createInteractions({ board, world, view, layer, ui }) {
 
   function undo() {
     endEdit();
+    zi.endLabelEdit();
     if (store.undo()) {
       setSelection([]);
       ui.toast(t('toast.undone'), { ms: 1400 });
@@ -231,6 +256,7 @@ export function createInteractions({ board, world, view, layer, ui }) {
   }
   function redo() {
     endEdit();
+    zi.endLabelEdit();
     if (store.redo()) {
       setSelection([]);
       ui.toast(t('toast.redone'), { ms: 1400 });
@@ -271,10 +297,24 @@ export function createInteractions({ board, world, view, layer, ui }) {
   }
 
   // Press on the background: dragging moves the board, a plain click clears the selection, a double click makes a new note.
+  // Pressing and holding still for a moment turns the press into drawing a zone (see zoneinteractions.js): move at
+  // once and it is a pan as always, so the hold never gets in the way of dragging the board.
   function beginBackgroundPress(e) {
     const start = { x: e.clientX, y: e.clientY };
     let last = { ...start };
     let panning = false;
+    let holdTimer = 0;
+    const stopHold = () => {
+      clearTimeout(holdTimer);
+      holdTimer = 0;
+    };
+    if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+      holdTimer = setTimeout(() => {
+        holdTimer = 0;
+        if (panning || !gesture || gesture.type !== 'bg' || gesture.pointerId !== e.pointerId) return;
+        gesture = zi.drawGesture(e, start);
+      }, ZONE_HOLD_MS);
+    }
     gesture = {
       type: 'bg',
       pointerId: e.pointerId,
@@ -282,6 +322,7 @@ export function createInteractions({ board, world, view, layer, ui }) {
         if (!panning) {
           if (Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < DRAG_THRESHOLD) return;
           panning = true;
+          stopHold();
           board.classList.add('panning');
           capturePointer(e.pointerId);
         }
@@ -289,11 +330,13 @@ export function createInteractions({ board, world, view, layer, ui }) {
         last = { x: ev.clientX, y: ev.clientY };
       },
       onUp(ev, cancelled) {
+        stopHold();
         board.classList.remove('panning');
         releasePointer(e.pointerId);
         if (panning || cancelled) return;
         endEdit();
         setSelection([]);
+        zi.clear();
         if (isDoubleTap(ev, 'bg')) capture?.createAt(ev.clientX, ev.clientY);
       },
     };
@@ -419,6 +462,7 @@ export function createInteractions({ board, world, view, layer, ui }) {
         }
 
         if (cancelled) return;
+        if (zoneLayer.isVeiled(id)) zoneLayer.revealNote(id); // a click opens a blurred note in a private zone
         if (collapseOnUp) setSelection([id]);
         if (!additive && isDoubleTap(ev, id)) {
           suppressClickUntil = performance.now() + 120; // keep the second click from opening a link
@@ -507,12 +551,21 @@ export function createInteractions({ board, world, view, layer, ui }) {
     const target = e.target;
     if (!target.closest('.color-wrap')) closePalettes();
     ui.closePopovers();
-    if (target.closest('textarea.editor')) return; // typing text
+    if (target.closest('textarea.editor') || target.closest('.zinput')) return; // typing text
     if (target.closest('.tools') || target.closest('.lk-copy')) return; // buttons on a note handle themselves on click
+    if (target.closest('.zbar') || target.closest('.zlock')) return; // so do the buttons of a zone
 
     if (e.button === 1 || spaceDown) {
       e.preventDefault();
       beginPan(e);
+      return;
+    }
+    // A zone lets clicks through everywhere except its name tab and, when selected, its handles.
+    const zoneEl = target.closest('.zone');
+    if (zoneEl) {
+      const handle = target.closest('.zh');
+      if (handle) zi.beginResize(e, zoneEl, handle.dataset.h);
+      else zi.beginTabPress(e, zoneEl);
       return;
     }
     const noteEl = target.closest('.note');
@@ -580,10 +633,11 @@ export function createInteractions({ board, world, view, layer, ui }) {
   // Clicking a note must not leave focus on a link or button inside it: otherwise pressing Enter
   // afterwards would "click" that link again instead of editing the text. Cancel the default of mousedown (click still works).
   world.addEventListener('mousedown', (e) => {
-    if (!e.target.closest('textarea')) e.preventDefault();
+    if (!e.target.closest('textarea, .zinput')) e.preventDefault();
   });
 
   world.addEventListener('click', (e) => {
+    if (zi.onWorldClick(e)) return;
     const linkCopy = e.target.closest('.lk-copy');
     if (linkCopy) {
       e.preventDefault();
@@ -640,7 +694,9 @@ export function createInteractions({ board, world, view, layer, ui }) {
     if (e.key === 'Escape') {
       if (ui.escape()) return;
       if (editing) { endEdit(); return; }
+      if (zi.isEditing()) { zi.endLabelEdit(true); return; }
       if (gesture) { cancelGesture(); return; }
+      if (zoneLayer.selected()) { zi.clear(); return; }
       if (selection.size) setSelection([]);
       return;
     }
@@ -659,6 +715,7 @@ export function createInteractions({ board, world, view, layer, ui }) {
     }
 
     if (inField || ui.blocking()) return;
+    if (!interactiveTarget(e.target) && zi.onKeyDown(e)) return; // Delete, Enter or F2 while a zone is selected
 
     switch (e.key) {
       case 'Delete':
@@ -678,6 +735,14 @@ export function createInteractions({ board, world, view, layer, ui }) {
       case 'n':
       case 'N':
         if (!e.shiftKey) { e.preventDefault(); capture?.createAtPointer(); }
+        break;
+      case 'z':
+      case 'Z':
+        if (!e.shiftKey && !e.repeat) { e.preventDefault(); zi.createAtPointer(); } // holding the key makes one zone, not dozens
+        break;
+      case 'g':
+      case 'G':
+        if (!e.shiftKey && !e.repeat) { e.preventDefault(); zi.wrapSelected(); }
         break;
       case 'Home':
         view.home();
@@ -737,6 +802,7 @@ export function createInteractions({ board, world, view, layer, ui }) {
     deleteIds,
     copyNotes,
     lastPointer: () => lastPointer,
+    zones: zi,
     setCapture(c) { capture = c; },
   };
 }

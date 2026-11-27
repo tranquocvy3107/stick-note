@@ -68,7 +68,7 @@ test('an empty board is saved and read back with non-ASCII text intact', async (
   try {
     const empty = await s.get();
     assert.equal(empty.rev, 0);
-    assert.deepEqual(empty.board, { notes: [], trash: [] });
+    assert.deepEqual(empty.board, { notes: [], trash: [], zones: [], zonesTrash: [] });
 
     // Vietnamese sample: diacritics and a percent-free URL must survive the round trip byte for byte.
     const text = 'Họp thứ Hai 10h — https://example.com/Việt_Nam?q=đ&x=1';
@@ -196,6 +196,99 @@ test('a restarted server remembers the data and the revision number', async () =
       assert.equal(board.rev, 1);
       assert.deepEqual(board.board.notes.map((n) => n.id), ['persisted']);
       assert.deepEqual(board.board.trash.map((n) => n.id), ['gone']);
+    } finally { await s2.close({ keep: true }); }
+  } finally { fs.rmSync(s.dir, { recursive: true, force: true }); }
+});
+
+// ---------------------------------------------------------------- zones
+
+const zone = (id, extra = {}) => ({ id, x: 40, y: 60, w: 400, h: 260, k: 'normal', t: `zone ${id}`, mt: 1, ...extra });
+
+test('zones are saved, read back and survive a restart, with non-ASCII labels intact', async () => {
+  const s = await boot();
+  const label = 'Hóa đơn — quan trọng';
+  await s.put(0, {
+    notes: [note('n1')], trash: [],
+    zones: [zone('z1', { t: label, k: 'important', p: 1 })],
+    zonesTrash: [zone('z0', { del: 5 })],
+  });
+  await s.close({ keep: true });
+  try {
+    const s2 = await boot(s.dir);
+    try {
+      const got = await s2.get();
+      assert.deepEqual(got.board.zones.map((z) => z.id), ['z1']);
+      assert.equal(got.board.zones[0].t, label);
+      assert.equal(got.board.zones[0].p, 1);
+      assert.deepEqual(got.board.zonesTrash.map((z) => z.id), ['z0']);
+      const onDisk = JSON.parse(fs.readFileSync(path.join(s.dir, 'board.json'), 'utf8'));
+      assert.equal(onDisk.zones.length, 1);
+      assert.equal(onDisk.schema, 1, 'zones are an additive field: the schema number stays the same');
+      assert.equal((await (await fetch(`${s2.base}/api/info`)).json()).zones, 1);
+    } finally { await s2.close({ keep: true }); }
+  } finally { fs.rmSync(s.dir, { recursive: true, force: true }); }
+});
+
+test('a save from a client that does not know zones keeps the zones on disk; an empty list clears them', async () => {
+  const s = await boot();
+  try {
+    await s.put(0, { notes: [note('a')], trash: [], zones: [zone('z1')], zonesTrash: [zone('z2', { del: 3 })] });
+    // A window still running the interface of version 1.1 leaves the zone fields out altogether.
+    assert.equal((await s.put(1, { notes: [note('a'), note('b')], trash: [] })).status, 200);
+    let got = await s.get();
+    assert.deepEqual(got.board.notes.map((n) => n.id), ['a', 'b']);
+    assert.deepEqual(got.board.zones.map((z) => z.id), ['z1'], 'the zones are untouched');
+    assert.deepEqual(got.board.zonesTrash.map((z) => z.id), ['z2']);
+    // An explicit empty list is a real change, not an omission.
+    assert.equal((await s.put(2, { notes: [note('a')], trash: [], zones: [], zonesTrash: [] })).status, 200);
+    got = await s.get();
+    assert.deepEqual(got.board.zones, []);
+    assert.deepEqual(got.board.zonesTrash, []);
+  } finally { await s.close(); }
+});
+
+test('a board file written by version 1.1 (no zones) opens, and the first save adds the zone lists', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stick-note-test-'));
+  fs.writeFileSync(path.join(dir, 'board.json'), JSON.stringify({ app: APP_ID, schema: 1, rev: 4, savedAt: null, notes: [note('old')], trash: [] }));
+  const s = await boot(dir);
+  try {
+    const got = await s.get();
+    assert.equal(got.rev, 4);
+    assert.deepEqual(got.board.notes.map((n) => n.id), ['old']);
+    assert.deepEqual(got.board.zones, []);
+    assert.deepEqual(got.board.zonesTrash, []);
+    assert.equal((await s.put(4, { notes: [note('old')], trash: [], zones: [zone('z')], zonesTrash: [] })).status, 200);
+    const onDisk = JSON.parse(fs.readFileSync(path.join(dir, 'board.json'), 'utf8'));
+    assert.deepEqual(onDisk.zones.map((z) => z.id), ['z']);
+  } finally { await s.close(); }
+});
+
+test('malformed zone data is rejected, and the answer to a stale save carries the zones', async () => {
+  const s = await boot();
+  try {
+    assert.equal((await s.put(0, { notes: [], trash: [], zones: 'x' })).status, 400);
+    assert.equal((await s.put(0, { notes: [], trash: [], zones: [{ nope: 1 }] })).status, 400);
+    assert.equal((await s.put(0, { notes: [], trash: [], zones: null })).status, 400);
+    assert.equal((await s.put(0, { notes: [], trash: [], zonesTrash: 5 })).status, 400);
+    assert.equal((await s.get()).rev, 0, 'nothing was written');
+
+    await s.put(0, { notes: [], trash: [], zones: [zone('z1')], zonesTrash: [] });
+    const stale = await s.put(0, { notes: [], trash: [], zones: [zone('z2')], zonesTrash: [] });
+    assert.equal(stale.status, 409);
+    assert.deepEqual((await stale.json()).board.zones.map((z) => z.id), ['z1']);
+  } finally { await s.close(); }
+});
+
+test('a damaged board.json is recovered from a backup that still holds the zones', async () => {
+  const s = await boot();
+  await s.put(0, { notes: [note('keep-me')], trash: [], zones: [zone('keep-zone')], zonesTrash: [] });
+  await s.put(1, { notes: [note('keep-me')], trash: [], zones: [zone('keep-zone'), zone('lost-zone')], zonesTrash: [] });
+  await s.close({ keep: true });
+  try {
+    fs.writeFileSync(path.join(s.dir, 'board.json'), '{"notes": [ trunc');
+    const s2 = await boot(s.dir);
+    try {
+      assert.deepEqual((await s2.get()).board.zones.map((z) => z.id), ['keep-zone']);
     } finally { await s2.close({ keep: true }); }
   } finally { fs.rmSync(s.dir, { recursive: true, force: true }); }
 });

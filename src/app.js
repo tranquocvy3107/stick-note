@@ -83,12 +83,15 @@ export function createApp({
       rev: Number(data.rev) || 0,
       notes: data.notes,
       trash: Array.isArray(data.trash) ? data.trash : [],
+      // Zones arrived in 1.2: a board file written by an older version simply has none.
+      zones: Array.isArray(data.zones) ? data.zones : [],
+      zonesTrash: Array.isArray(data.zonesTrash) ? data.zonesTrash : [],
       savedAt: data.savedAt || null,
     };
   }
 
   function loadBoard() {
-    const empty = { rev: 0, notes: [], trash: [], savedAt: null };
+    const empty = { rev: 0, notes: [], trash: [], zones: [], zonesTrash: [], savedAt: null };
     if (!fs.existsSync(boardFile)) return empty;
     try {
       return readBoardFile(boardFile);
@@ -109,6 +112,9 @@ export function createApp({
   }
 
   let board = loadBoard();
+
+  // What a client receives: the lists it edits (not rev or savedAt, which travel beside it).
+  const boardContent = () => ({ notes: board.notes, trash: board.trash, zones: board.zones, zonesTrash: board.zonesTrash });
 
   function pruneBackups() {
     try {
@@ -163,7 +169,7 @@ export function createApp({
     if (p === '/api/rev' && m === 'GET') return sendJson(res, 200, { rev: board.rev });
 
     if (p === '/api/board' && m === 'GET') {
-      return sendJson(res, 200, { rev: board.rev, savedAt: board.savedAt, board: { notes: board.notes, trash: board.trash } });
+      return sendJson(res, 200, { rev: board.rev, savedAt: board.savedAt, board: boardContent() });
     }
 
     if (p === '/api/board' && m === 'PUT') return putBoard(req, res);
@@ -176,7 +182,7 @@ export function createApp({
       return sendJson(res, 200, {
         app: APP_ID, version: VERSION, channel: buildInfo.channel || 'source', platform: process.platform,
         dataDir, port: actualPort, rev: board.rev,
-        notes: board.notes.length, trash: board.trash.length, backups: backups.slice(0, 10),
+        notes: board.notes.length, trash: board.trash.length, zones: board.zones.length, backups: backups.slice(0, 10),
         uptimeSec: Math.round((Date.now() - startedAt) / 1000),
       });
     }
@@ -226,15 +232,19 @@ export function createApp({
     const incoming = data && data.board;
     const notes = cleanList(incoming && incoming.notes, 50_000);
     const trash = cleanList(incoming ? incoming.trash ?? [] : null, 50_000);
-    if (!notes || !trash) return sendError(res, 400, 'invalid_board', 'The board data is malformed');
+    // Zones are optional on the way in: a window still running the interface of an older version does not know
+    // about them and leaves them out, which must not wipe the zones already saved.
+    const zones = incoming && incoming.zones === undefined ? board.zones : cleanList(incoming ? incoming.zones : null, 10_000);
+    const zonesTrash = incoming && incoming.zonesTrash === undefined ? board.zonesTrash : cleanList(incoming ? incoming.zonesTrash : null, 10_000);
+    if (!notes || !trash || !zones || !zonesTrash) return sendError(res, 400, 'invalid_board', 'The board data is malformed');
 
     if (Number(data.baseRev) !== board.rev) {
       // Not a plain error: the client merges this board with its own and saves again.
-      return sendJson(res, 409, { error: 'conflict', message: 'The board changed elsewhere', rev: board.rev, board: { notes: board.notes, trash: board.trash } });
+      return sendJson(res, 409, { error: 'conflict', message: 'The board changed elsewhere', rev: board.rev, board: boardContent() });
     }
     try {
       backupBeforeWrite(notes);
-      const next = { app: APP_ID, schema: 1, rev: board.rev + 1, savedAt: new Date().toISOString(), notes, trash };
+      const next = { app: APP_ID, schema: 1, rev: board.rev + 1, savedAt: new Date().toISOString(), notes, trash, zones, zonesTrash };
       writeFileAtomic(boardFile, JSON.stringify(next));
       board = next;
     } catch (err) {
