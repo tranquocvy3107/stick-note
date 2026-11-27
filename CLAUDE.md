@@ -54,7 +54,7 @@ It runs on the user's own computer (Windows and Linux; macOS later), offline, as
 
 From a Windows terminal run `.\start.bat` (this machine sets `NoDefaultCurrentDirectoryInExePath=1`, so a bare `start.bat` is not found).
 
-Environment variables: `PORT` (default 4747), `STICK_NOTE_DATA` (data folder), `STICK_NOTE_IDLE_MS` (how long without a window before the background server quits, default 300000), `STICK_NOTE_BROWSER` (path of the browser used for the app window), `STICK_NOTE_NO_OPEN=1` (print `OPEN <url>` instead of opening a window; use it in every automated test).
+Environment variables: `PORT` (default 4747), `STICK_NOTE_DATA` (data folder), `STICK_NOTE_IDLE_MS` (how long after the last window said goodbye the background server quits, default 300000), `STICK_NOTE_BROWSER` (path of the browser used for the app window), `STICK_NOTE_NO_OPEN=1` (print `OPEN <url>` instead of opening a window; use it in every automated test).
 
 **When testing, always point `STICK_NOTE_DATA` at a temp folder and use another port (4748, 4750, ...)** so real notes and the owner's running copy are never touched.
 
@@ -67,6 +67,7 @@ server.js              Entry point and command line
 src/
   paths.js             Where things live: app folder, data folder (per install channel), build-info.json, VERSION
   app.js               createApp(): HTTP server, JSON API, board storage, images, backups, idle exit
+  presence.js          Which windows are open and when the background server may quit (pure, tested)
   launcher.js          probe/wait, browser detection (Windows, Linux, macOS), open the app window, --stop
   http.js, util.js     Response helpers and CSP; atomic file write, image sniffing, timestamps
 public/
@@ -74,7 +75,7 @@ public/
   css/app.css          All styling, light and dark
   locales/             en.json (the reference), vi.json
   js/
-    main.js            Start-up: i18n, wiring, load, heartbeat, save on exit
+    main.js            Start-up: i18n, wiring, load, hello/goodbye to the server, save on exit
     i18n.js            Tiny translation layer (placeholders, plurals, [[kbd]] and **bold** markup)
     store.js           Data, undo/redo, autosave, conflict handling. Every data change goes through here
     merge.js           Merge two versions of the board item by item, notes and zones (pure, tested)
@@ -110,11 +111,11 @@ Zone: `{ id, x, y, w, h, k: 'important'|'normal'|'low', p? (1 = private), t? (na
 - On a save error it retries with growing delays (up to 15 s), mirrors the board into `localStorage['stick-note:pending']`, and shows a red banner after 4 s. The mirror is merged back on the next start.
 - The server writes safely (temp file, fsync, rename). Backups: one per day (60 kept), a `before-shrink` copy when the note count drops below 60 %, `manual` copies. A damaged `board.json` is recovered from the newest backup.
 - Images are stored by content hash (`<sha1>.<ext>`), never overwritten, never deleted (orphans of purged notes stay; there is no cleanup tool yet).
-- The server binds to `127.0.0.1` only and checks `Host`, `Origin` and the `X-Stick-Note` header on writes; the CSP forbids inline script. It quits when no window has pinged `/api/ping` for 5 minutes (the window pings every 20 s).
+- The server binds to `127.0.0.1` only and checks `Host`, `Origin` and the `X-Stick-Note` header on writes; the CSP forbids inline script. A background server quits by itself once no window is left: each window has a name (kept in `sessionStorage`), says hello with `GET /api/ping?w=<name>` every 20 s and goodbye with `POST /api/bye?w=<name>` when it closes, and the server quits `STICK_NOTE_IDLE_MS` after the last goodbye. A window that merely goes quiet still counts as open (see the first trap below); windows of 1.2.0 and older ping without a name, and for them the old rule holds (quit after that much silence). Details and the one-week safety net are in `src/presence.js`.
 
 ### API
 
-`GET /api/ping`, `GET /api/rev`, `GET|PUT /api/board`, `POST /api/images`, `POST /api/thumb?of=<id>`, `GET /img/<id>`, `GET /api/info`, `POST /api/backup`, `POST /api/open-data-folder`, `POST /api/shutdown`.
+`GET /api/ping[?w=<window>]`, `POST /api/bye?w=<window>`, `GET /api/rev`, `GET|PUT /api/board`, `POST /api/images`, `POST /api/thumb?of=<id>`, `GET /img/<id>`, `GET /api/info` (version, channel, data folder, counts, windows open), `POST /api/backup`, `POST /api/open-data-folder`, `POST /api/shutdown`.
 Errors are `{ "error": "<code>", "message": "<English text>" }`; the interface translates by code.
 
 ### Translations
@@ -134,6 +135,7 @@ Release procedure (ask the owner before every push, PR, tag or release):
 
 ## Traps we already fell into
 
+- **A quiet window is not a closed window.** A browser freezes or slows down a window that is minimised or hidden, so its timers (the 20 s heartbeat) can stop for hours. Version 1.2.0 quit the server after 5 minutes without a heartbeat, and a window left alone found its server gone ("Lost connection to the server", log line `No window has been open for a while`). The server now keeps running until a named window says goodbye (`presence.js`); never go back to "silence means closed". To reproduce a frozen window drive a throw-away headless Edge through the DevTools protocol: `Page.setWebLifecycleState` with `frozen`, and a server started with `STICK_NOTE_IDLE_MS=3000`. The old rule needs about 10 s to show, the new one survives indefinitely.
 - **Never change a CSS custom property on a parent of the notes every frame.** Variables are inherited, so every note's style is recalculated (it cost 160 ms per frame with 1,500 notes). The grid is set directly on the board's style in `view.js`.
 - **A note's toolbar is built lazily** (`ensureTools`, at most 12 alive). Building it up front for every note is 50,000+ hidden elements.
 - **Do not leave focus on a link or button inside a note** (`mousedown` is cancelled, `click` still works). Otherwise `Enter` clicks it again instead of editing.

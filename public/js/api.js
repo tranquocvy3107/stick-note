@@ -59,8 +59,19 @@ export const api = {
     return res.json(); // { id }
   },
 
-  ping() {
-    return fetch('/api/ping', { cache: 'no-store' }).then((r) => r.ok).catch(() => false);
+  // Tells the server this window is open. `windowId` names the window: the server keeps running until a named
+  // window says goodbye, because a browser may freeze a hidden window and silence does not mean it is closed.
+  ping(windowId) {
+    const query = windowId ? `?w=${encodeURIComponent(windowId)}` : '';
+    return fetch(`/api/ping${query}`, { cache: 'no-store' }).then((r) => r.ok).catch(() => false);
+  },
+
+  // Tells the server this window is closing. Fire and forget: `keepalive` lets the request outlive the page.
+  bye(windowId) {
+    if (!windowId) return;
+    try {
+      fetch(`/api/bye?w=${encodeURIComponent(windowId)}`, { method: 'POST', headers: WRITE_HEADERS, keepalive: true }).catch(() => {});
+    } catch { /* the page is going away anyway */ }
   },
 
   async info() {

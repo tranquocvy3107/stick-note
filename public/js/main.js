@@ -9,9 +9,25 @@ import { createInteractions } from './interactions.js';
 import { createCapture } from './capture.js';
 import { createUI, loadSettings } from './ui.js';
 import { initI18n, applyStaticTranslations } from './i18n.js';
-import { debounce } from './util.js';
+import { debounce, uid } from './util.js';
 
 const VIEW_KEY = 'stick-note:view';
+const WINDOW_KEY = 'stick-note:window';
+
+// A name for this window, kept across reloads (sessionStorage belongs to the window). The server uses it to know
+// which windows are open.
+function windowId() {
+  try {
+    let id = sessionStorage.getItem(WINDOW_KEY);
+    if (!id) {
+      id = uid('w');
+      sessionStorage.setItem(WINDOW_KEY, id);
+    }
+    return id;
+  } catch {
+    return uid('w'); // storage is blocked: a new name for every page load is still fine
+  }
+}
 
 async function boot() {
   // The translations come from the server too. If it is still starting, show the offline notice
@@ -70,16 +86,19 @@ async function boot() {
   }
   ui.refreshHint();
 
-  // Heartbeat: tells the server this window is still open (it quits by itself when no window is left).
-  setInterval(() => api.ping(), 20_000);
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) return;
-    api.ping();
-    store.checkRemote();
-  });
+  // Tell the server this window is open, and say goodbye when it closes: the server quits by itself once no window
+  // is left. The server does not count a quiet window as closed (a browser may freeze a hidden one for hours), so the
+  // goodbye matters more than the heartbeat.
+  const myId = windowId();
+  api.ping(myId);
+  setInterval(() => api.ping(myId), 20_000);
+  const wake = () => { api.ping(myId); store.checkRemote(); };
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) wake(); });
+  document.addEventListener('resume', wake); // the browser woke this window from a freeze
+  window.addEventListener('pageshow', (e) => { if (e.persisted) wake(); });
   window.addEventListener('focus', () => store.checkRemote());
   window.addEventListener('beforeunload', () => { saveView.flush(); store.flushOnExit(); });
-  window.addEventListener('pagehide', () => store.flushOnExit());
+  window.addEventListener('pagehide', () => { store.flushOnExit(); api.bye(myId); });
 
   // For testing and debugging in the Console: window.stickNote
   window.stickNote = { store, view, layer, zoneLayer, inter, ui, capture };

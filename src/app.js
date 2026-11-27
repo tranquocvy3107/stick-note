@@ -8,6 +8,7 @@ import { spawn } from 'node:child_process';
 import { APP_ID, DEFAULT_PORT, ROOT, VERSION, readBuildInfo } from './paths.js';
 import { localDay, stamp, sniffImage, writeFileAtomic } from './util.js';
 import { HTML_CSP, MIME, SECURITY_HEADERS, readBody, sendError, sendJson, sendText } from './http.js';
+import { createPresence } from './presence.js';
 
 const MAX_BOARD_BYTES = 64 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
@@ -35,9 +36,11 @@ function cleanList(list, max) {
  * @param {number}   [options.port]        TCP port; 0 picks a free one (used by tests).
  * @param {string}   options.dataDir       Folder for board.json, images/ and backups/.
  * @param {string}   [options.publicDir]   Folder with the web interface.
- * @param {number}   [options.idleExitMs]  Exit this long after the last window heartbeat (0 = never).
+ * @param {number}   [options.idleExitMs]  Quit this long after the last window said goodbye (0 = never). See presence.js.
+ * @param {number}   [options.windowTtlMs] A window silent for this long is counted as gone (default: a week).
  * @param {boolean}  [options.logToConsole]
- * @param {Function} [options.onShutdown]  Called when a client asks the server to quit (POST /api/shutdown).
+ * @param {Function} [options.onShutdown]  Called when the server should quit: a client asked (POST /api/shutdown)
+ *                                         or no window is left. Without it the idle exit stops the server and the process.
  * @param {object}   [options.buildInfo]   Contents of build-info.json (how this copy was packaged).
  */
 export function createApp({
@@ -45,6 +48,7 @@ export function createApp({
   dataDir,
   publicDir = path.join(ROOT, 'public'),
   idleExitMs = 0,
+  windowTtlMs = undefined,
   logToConsole = true,
   onShutdown = null,
   buildInfo = readBuildInfo(),
@@ -61,7 +65,7 @@ export function createApp({
   fs.mkdirSync(backupsDir, { recursive: true });
 
   let actualPort = port;
-  let lastBeat = Date.now();
+  const presence = createPresence({ idleExitMs, windowTtlMs });
   const startedAt = Date.now();
 
   function log(...parts) {
@@ -162,8 +166,13 @@ export function createApp({
     }
 
     if (p === '/api/ping' && m === 'GET') {
-      lastBeat = Date.now();
+      presence.ping(url.searchParams.get('w')); // the window's name; older versions send none
       return sendJson(res, 200, { app: APP_ID, version: VERSION, t: Date.now() });
+    }
+
+    if (p === '/api/bye' && m === 'POST') {
+      presence.bye(url.searchParams.get('w'));
+      return sendJson(res, 200, { ok: true });
     }
 
     if (p === '/api/rev' && m === 'GET') return sendJson(res, 200, { rev: board.rev });
@@ -182,7 +191,8 @@ export function createApp({
       return sendJson(res, 200, {
         app: APP_ID, version: VERSION, channel: buildInfo.channel || 'source', platform: process.platform,
         dataDir, port: actualPort, rev: board.rev,
-        notes: board.notes.length, trash: board.trash.length, zones: board.zones.length, backups: backups.slice(0, 10),
+        notes: board.notes.length, trash: board.trash.length, zones: board.zones.length, windows: presence.count,
+        backups: backups.slice(0, 10),
         uptimeSec: Math.round((Date.now() - startedAt) / 1000),
       });
     }
@@ -372,19 +382,23 @@ export function createApp({
       server.listen(port, '127.0.0.1', () => {
         server.off('error', reject);
         actualPort = server.address().port;
-        lastBeat = Date.now();
+        presence.ping(); // starting counts as activity: the window that caused the start is about to say hello
         if (idleExitMs > 0) {
+          // Often enough for the delay to be accurate, rarely enough to cost nothing.
+          const tickMs = Math.min(10_000, Math.max(100, Math.floor(idleExitMs / 4)));
           let lastTick = Date.now();
           idleTimer = setInterval(() => {
             const now = Date.now();
-            // The computer just woke from sleep and the clock jumped: give the window time to send a heartbeat.
-            if (now - lastTick > 30_000) lastBeat = now;
+            // The computer just woke from sleep and the clock jumped: give the windows time to say hello again.
+            if (now - lastTick > Math.max(30_000, tickMs * 3)) presence.wake();
             lastTick = now;
-            if (now - lastBeat > idleExitMs) {
-              log('No window has been open for a while; shutting down.');
-              stop().then(() => process.exit(0));
+            if (presence.shouldQuit()) {
+              clearInterval(idleTimer);
+              log('No window is open any more; shutting down.');
+              if (onShutdown) onShutdown();
+              else stop().then(() => process.exit(0));
             }
-          }, 10_000);
+          }, tickMs);
         }
         log(`Stick Note ${VERSION} is running at http://127.0.0.1:${actualPort}/ (data: ${dataDir})`);
         resolve(actualPort);

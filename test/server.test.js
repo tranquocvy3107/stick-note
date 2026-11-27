@@ -387,6 +387,75 @@ test('POST /api/shutdown needs the custom header and calls the shutdown hook', a
   } finally { await s.close(); }
 });
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+async function until(fn, ms = 4000) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    if (await fn()) return true;
+    await sleep(25);
+  }
+  return false;
+}
+const info = async (s) => (await fetch(`${s.base}/api/info`)).json();
+
+test('a named window keeps the server running while it is quiet; the server quits after its goodbye', async () => {
+  let quits = 0;
+  const s = await boot(undefined, { idleExitMs: 300, onShutdown: () => { quits += 1; } });
+  try {
+    const id = 'w-test-window-1';
+    assert.equal((await fetch(`${s.base}/api/ping?w=${id}`)).status, 200);
+    assert.equal((await info(s)).windows, 1);
+
+    // Four times the delay without a single heartbeat: a frozen window, not a closed one.
+    await sleep(1200);
+    assert.equal(quits, 0, 'the server must not quit while a window that said hello has not said goodbye');
+
+    // The goodbye is a write, so it needs the custom header like every other one.
+    assert.equal((await fetch(`${s.base}/api/bye?w=${id}`, { method: 'POST' })).status, 403);
+    assert.equal((await info(s)).windows, 1);
+    assert.equal((await fetch(`${s.base}/api/bye?w=${id}`, { method: 'POST', headers: WRITE })).status, 200);
+    assert.equal((await info(s)).windows, 0);
+
+    assert.ok(await until(() => quits === 1), 'the server quits once the last window has said goodbye');
+  } finally { await s.close(); }
+});
+
+test('a window that reloads (goodbye, then hello again) does not stop the server', async () => {
+  let quits = 0;
+  const s = await boot(undefined, { idleExitMs: 600, onShutdown: () => { quits += 1; } });
+  try {
+    const id = 'w-test-window-2';
+    await fetch(`${s.base}/api/ping?w=${id}`);
+    await fetch(`${s.base}/api/bye?w=${id}`, { method: 'POST', headers: WRITE });
+    await sleep(200);
+    await fetch(`${s.base}/api/ping?w=${id}`); // the reloaded page says hello again
+    await sleep(1200);
+    assert.equal(quits, 0);
+    assert.equal((await info(s)).windows, 1);
+  } finally { await s.close(); }
+});
+
+test('windows of older versions (ping without a name) keep the old rule: quit after a silence', async () => {
+  let quits = 0;
+  const s = await boot(undefined, { idleExitMs: 400, onShutdown: () => { quits += 1; } });
+  try {
+    await fetch(`${s.base}/api/ping`);
+    await sleep(150);
+    assert.equal(quits, 0, 'a recent ping is not a silence yet');
+    assert.ok(await until(() => quits === 1), 'quits once nothing has been heard for the delay');
+    assert.equal((await info(s)).windows, 0);
+  } finally { await s.close(); }
+});
+
+test('a server started without an idle delay never quits by itself', async () => {
+  let quits = 0;
+  const s = await boot(undefined, { idleExitMs: 0, onShutdown: () => { quits += 1; } });
+  try {
+    await sleep(500);
+    assert.equal(quits, 0);
+  } finally { await s.close(); }
+});
+
 test('sniffImage detects the format from content, not from the file name', () => {
   assert.equal(sniffImage(PNG), 'png');
   assert.equal(sniffImage(Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0])), 'jpg');
