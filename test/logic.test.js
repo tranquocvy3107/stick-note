@@ -1,4 +1,4 @@
-// Kiểm thử phần logic thuần của giao diện (không cần trình duyệt). Chạy: npm test
+// Tests for the pure logic of the interface (no browser needed). Run with: npm test
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,90 +8,94 @@ import { mergeBoards } from '../public/js/merge.js';
 const links = (text) => splitLinks(text).filter((t) => t.type === 'link').map((t) => t.value);
 const texts = (text) => splitLinks(text).filter((t) => t.type === 'text').map((t) => t.value);
 
-test('splitLinks: tách link và bỏ dấu câu ở cuối', () => {
-  const parts = splitLinks('Xem https://a.com/x. Rồi quay lại');
-  assert.deepEqual(parts.map((p) => p.value), ['Xem ', 'https://a.com/x', '. Rồi quay lại']);
+test('splitLinks: separates links and drops trailing punctuation', () => {
+  const parts = splitLinks('See https://a.com/x. Then come back');
+  assert.deepEqual(parts.map((p) => p.value), ['See ', 'https://a.com/x', '. Then come back']);
   assert.equal(parts[1].type, 'link');
   assert.equal(parts[1].href, 'https://a.com/x');
 });
 
-test('splitLinks: giữ ngoặc đơn cân bằng trong link (Wikipedia), bỏ ngoặc thừa', () => {
+test('splitLinks: keeps balanced parentheses inside a link (Wikipedia) and drops extra ones', () => {
   assert.deepEqual(links('https://en.wikipedia.org/wiki/Foo_(bar)'), ['https://en.wikipedia.org/wiki/Foo_(bar)']);
-  assert.deepEqual(links('(xem https://a.com/x)'), ['https://a.com/x']);
-  assert.deepEqual(texts('(xem https://a.com/x)'), ['(xem ', ')']);
+  assert.deepEqual(links('(see https://a.com/x)'), ['https://a.com/x']);
+  assert.deepEqual(texts('(see https://a.com/x)'), ['(see ', ')']);
 });
 
-test('splitLinks: www. được thêm https, nhiều link, tiếng Việt xung quanh', () => {
-  const parts = splitLinks('Tài liệu: www.example.com/abc, và http://localhost:3000/a?b=1&c=2\nhết');
+test('splitLinks: www. gets https, several links, non-ASCII text around them', () => {
+  const sample = 'Tài liệu: www.example.com/abc, và http://localhost:3000/a?b=1&c=2\nhết';
+  const parts = splitLinks(sample);
   const found = parts.filter((p) => p.type === 'link');
   assert.equal(found.length, 2);
   assert.equal(found[0].href, 'https://www.example.com/abc');
   assert.equal(found[1].href, 'http://localhost:3000/a?b=1&c=2');
-  assert.equal(parts.map((p) => p.value).join(''), 'Tài liệu: www.example.com/abc, và http://localhost:3000/a?b=1&c=2\nhết');
+  assert.equal(parts.map((p) => p.value).join(''), sample);
 });
 
-test('splitLinks: không biến chữ thường và giao thức nguy hiểm thành link', () => {
-  assert.deepEqual(links('javascript:alert(1) và file.txt và node.js và ASP.NET'), []);
+test('splitLinks: plain words and dangerous protocols never become links', () => {
+  assert.deepEqual(links('javascript:alert(1) and file.txt and node.js and ASP.NET'), []);
   assert.deepEqual(links(''), []);
-  assert.deepEqual(splitLinks('chỉ có chữ'), [{ type: 'text', value: 'chỉ có chữ' }]);
+  assert.deepEqual(splitLinks('just words'), [{ type: 'text', value: 'just words' }]);
 });
 
-test('splitLinks: nối các đoạn lại luôn ra đúng văn bản gốc', () => {
+test('splitLinks: joining the parts always gives back the original text', () => {
   const samples = [
     'a https://x.com/p.q?r=1#h) b',
     'https://a.com https://b.com',
     '"https://quoted.com/path"',
-    'cuối câu https://a.com/b!',
+    'end of sentence https://a.com/b!',
   ];
   for (const s of samples) assert.equal(splitLinks(s).map((p) => p.value).join(''), s);
 });
 
-test('shortUrl: bỏ giao thức, www, dấu / cuối và giải mã chữ Việt', () => {
+test('shortUrl: drops the protocol, www and trailing slash, and decodes percent-encoded text', () => {
   assert.equal(shortUrl('https://www.example.com/'), 'example.com');
   assert.equal(shortUrl('http://example.com/a/b'), 'example.com/a/b');
   assert.equal(shortUrl('https://vi.wikipedia.org/wiki/Vi%E1%BB%87t_Nam'), 'vi.wikipedia.org/wiki/Việt_Nam');
-  assert.equal(shortUrl('https://a.com/%E0%A4%A'), 'a.com/%E0%A4%A', 'mã hóa dở dang thì giữ nguyên');
+  assert.equal(shortUrl('https://a.com/%E0%A4%A'), 'a.com/%E0%A4%A', 'a broken escape sequence is left as it is');
 });
 
-test('shortUrl: link quá dài được rút gọn ở giữa nhưng giữ đầu và đuôi', () => {
+test('shortUrl: a very long link is shortened in the middle but keeps its start and end', () => {
   const long = `https://example.com/${'a'.repeat(80)}/end-of-link`;
   const short = shortUrl(long);
   assert.ok(short.length < 50);
   assert.ok(short.startsWith('example.com/aaaa'));
-  assert.equal(short.slice(-10), long.slice(-10), 'giữ nguyên 10 ký tự cuối của link');
+  assert.equal(short.slice(-10), long.slice(-10), 'the last 10 characters of the link are kept');
   assert.ok(short.includes('…'));
 });
 
-test('breakable: chỉ thêm điểm xuống dòng, bỏ đi thì ra đúng chữ cũ', () => {
+test('breakable: only adds break opportunities; removing them gives the original text', () => {
   const s = 'github.com/anthropics/claude-code/issues?id=1&x=2_y';
   const b = breakable(s);
   assert.ok(b.includes('​'));
   assert.equal(b.replaceAll('​', ''), s);
-  assert.equal(breakable('khongcodau'), 'khongcodau');
+  assert.equal(breakable('nopunctuation'), 'nopunctuation');
 });
 
-test('fold: bỏ dấu tiếng Việt, đ thành d, không phân biệt hoa thường', () => {
+test('fold: strips diacritics, maps đ to d and ignores case (search is forgiving)', () => {
+  // Vietnamese fixtures: the original author searches notes written with and without diacritics.
   assert.equal(fold('Đường Hầm Cà Phê'), 'duong ham ca phe');
   assert.equal(fold('ĐỌC SAU'), 'doc sau');
   assert.ok(fold('Mua cà phê cho buổi họp').includes(fold('CA PHE')));
+  assert.equal(fold('Crème brûlée'), 'creme brulee');
   assert.equal(fold(null), '');
 });
 
-test('timeAgo: mô tả thời gian bằng tiếng Việt', () => {
+test('timeAgo: relative time follows the interface language, then falls back to a date', () => {
   const now = 1_700_000_000_000;
-  assert.equal(timeAgo(now - 10_000, now), 'vừa xong');
-  assert.equal(timeAgo(now - 5 * 60_000, now), '5 phút trước');
-  assert.equal(timeAgo(now - 3 * 3_600_000, now), '3 giờ trước');
-  assert.equal(timeAgo(now - 2 * 86_400_000, now), '2 ngày trước');
-  assert.match(timeAgo(now - 90 * 86_400_000, now), /^\d{2}\/\d{2}\/\d{4}$/);
+  assert.equal(timeAgo(now - 10_000, { now, justNow: 'just now' }), 'just now');
+  assert.equal(timeAgo(now - 5 * 60_000, { now, lang: 'en' }), '5 minutes ago');
+  assert.equal(timeAgo(now - 3 * 3_600_000, { now, lang: 'en' }), '3 hours ago');
+  assert.equal(timeAgo(now - 2 * 86_400_000, { now, lang: 'en' }), '2 days ago');
+  assert.equal(timeAgo(now - 5 * 60_000, { now, lang: 'vi' }), '5 phút trước');
+  assert.match(timeAgo(now - 90 * 86_400_000, { now, lang: 'en' }), /2023/);
 });
 
-test('readingOrder: hàng từ trên xuống, trong hàng từ trái sang phải, chịu được lệch tay', () => {
+test('readingOrder: rows top to bottom, left to right within a row, tolerant of sloppy placement', () => {
   const n = (id, x, y) => ({ id, x, y });
-  // Hàng 1 dán lệch nhau vài chục px, hàng 2 ở dưới.
+  // Row 1 notes are a few dozen px out of line; row 2 is below.
   const input = [n('r2-b', 400, 300), n('r1-c', 700, 56), n('r2-a', 50, 310), n('r1-a', 60, 100), n('r1-b', 330, 40)];
   assert.deepEqual(readingOrder(input).map((x) => x.id), ['r1-a', 'r1-b', 'r1-c', 'r2-a', 'r2-b']);
-  assert.deepEqual(input.map((x) => x.id), ['r2-b', 'r1-c', 'r2-a', 'r1-a', 'r1-b'], 'không đổi mảng gốc');
+  assert.deepEqual(input.map((x) => x.id), ['r2-b', 'r1-c', 'r2-a', 'r1-a', 'r1-b'], 'the input array is not modified');
   assert.deepEqual(readingOrder([]), []);
   assert.deepEqual(readingOrder([n('only', 1, 1)]).map((x) => x.id), ['only']);
 });
@@ -102,12 +106,12 @@ test('clamp', () => {
   assert.equal(clamp(2, 0, 3), 2);
 });
 
-// ---------------------------------------------------------------- gộp dữ liệu
+// ---------------------------------------------------------------- merging
 
 const note = (id, mt, extra = {}) => ({ id, x: 0, y: 0, t: id, mt, ...extra });
 const ids = (list) => list.map((n) => n.id).sort();
 
-test('mergeBoards: giữ mọi mảnh giấy chỉ có ở một phía', () => {
+test('mergeBoards: keeps every note that exists on only one side', () => {
   const merged = mergeBoards(
     { notes: [note('a', 1), note('local-only', 5)], trash: [] },
     { notes: [note('a', 1), note('remote-only', 6)], trash: [] },
@@ -116,16 +120,16 @@ test('mergeBoards: giữ mọi mảnh giấy chỉ có ở một phía', () => {
   assert.deepEqual(merged.trash, []);
 });
 
-test('mergeBoards: cùng một mảnh giấy thì bản sửa muộn hơn thắng, theo từng mảnh', () => {
+test('mergeBoards: for the same note the later edit wins, note by note', () => {
   const local = { notes: [note('a', 10, { x: 100 }), note('b', 1, { x: 1 })], trash: [] };
   const remote = { notes: [note('a', 5, { x: 50 }), note('b', 9, { x: 90 })], trash: [] };
   const merged = mergeBoards(local, remote);
   const byId = Object.fromEntries(merged.notes.map((n) => [n.id, n]));
-  assert.equal(byId.a.x, 100, 'a: bản local mới hơn');
-  assert.equal(byId.b.x, 90, 'b: bản remote mới hơn');
+  assert.equal(byId.a.x, 100, 'a: the local copy is newer');
+  assert.equal(byId.b.x, 90, 'b: the remote copy is newer');
 });
 
-test('mergeBoards: xóa muộn hơn sửa thì mảnh giấy vào thùng rác, sửa muộn hơn xóa thì còn nguyên', () => {
+test('mergeBoards: a later delete sends the note to the trash, a later edit keeps it', () => {
   const deletedLater = mergeBoards(
     { notes: [note('a', 5)], trash: [] },
     { notes: [], trash: [note('a', 9, { del: 9 })] },
@@ -141,7 +145,7 @@ test('mergeBoards: xóa muộn hơn sửa thì mảnh giấy vào thùng rác, s
   assert.deepEqual(ids(editedLater.trash), []);
 });
 
-test('mergeBoards: bằng thời gian thì ưu tiên thùng rác (không làm sống lại mảnh đã xóa)', () => {
+test('mergeBoards: on a tie the trash wins (a deleted note is never resurrected)', () => {
   const merged = mergeBoards(
     { notes: [note('a', 7)], trash: [] },
     { notes: [], trash: [note('a', 7, { del: 7 })] },
@@ -149,7 +153,7 @@ test('mergeBoards: bằng thời gian thì ưu tiên thùng rác (không làm s�
   assert.deepEqual(ids(merged.trash), ['a']);
 });
 
-test('mergeBoards: chịu được dữ liệu thiếu', () => {
+test('mergeBoards: tolerates missing data', () => {
   assert.deepEqual(mergeBoards({}, undefined), { notes: [], trash: [] });
   assert.deepEqual(ids(mergeBoards({ notes: [note('a', 1)] }, null).notes), ['a']);
 });

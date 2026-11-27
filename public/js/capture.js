@@ -1,19 +1,20 @@
-// Mọi đường để đưa một thứ gì đó lên bảng:
-//   - kéo mảnh giấy từ khay (hoặc bấm vào khay)
-//   - nhấp đúp lên nền, hoặc phím N
-//   - dán (Ctrl+V): chữ, link, ảnh/screenshot
-//   - kéo-thả từ ngoài vào: link, chữ, ảnh, file .url/.txt
+// Every way of getting something onto the board:
+//   - drag a slip from the tray (or click the tray)
+//   - double-click the background, or press N
+//   - paste (Ctrl+V): text, a link, an image or screenshot
+//   - drag and drop from outside: links, text, images, .url/.txt files
 
 import * as store from './store.js';
 import { h, rand, round, isTextField } from './util.js';
 import { NOTE_W, NOTE_H } from './constants.js';
 import { storeImage, isImageFile } from './image.js';
+import { t } from './i18n.js';
 
 export function createCapture({ board, view, layer, inter, ui, dockEl }) {
   const { state } = store;
   const tilt = () => round(rand(-1.8, 1.8), 2);
 
-  // Nếu chỗ định đặt đã có một mảnh giấy nằm sát đúng vị trí đó thì dịch chéo ra một chút.
+  // If a note already sits almost exactly where the new one would go, shift it diagonally a little.
   function freeSpot(x, y) {
     const notes = [...state.notes.values()];
     for (let i = 0; i < 60; i++) {
@@ -24,16 +25,16 @@ export function createCapture({ board, view, layer, inter, ui, dockEl }) {
     return { x, y };
   }
 
-  // Điểm trên bảng nơi con trỏ đang đứng, hoặc giữa màn hình nếu không biết.
+  // The board point under the pointer, or the middle of the screen if unknown.
   function pointerWorld() {
     const p = inter.lastPointer();
     const sz = view.size();
     return view.toWorld(p ? p.x : sz.w / 2, p ? p.y : sz.h / 2);
   }
 
-  // ------------------------------------------------------------ giấy trống để gõ
+  // ------------------------------------------------------------ blank notes to type into
 
-  // Tạo mảnh giấy trống có tâm tại (cx, cy) (tọa độ world) rồi vào chế độ gõ ngay.
+  // Create a blank note centred on (cx, cy) (world coordinates) and start editing it right away.
   function createBlank({ cx, cy, color = 'yellow', r = tilt(), exact = false }) {
     let x = cx - NOTE_W / 2;
     let y = cy - NOTE_H / 2;
@@ -67,33 +68,33 @@ export function createCapture({ board, view, layer, inter, ui, dockEl }) {
     return createBlank({ cx: p.x, cy: p.y, color });
   }
 
-  // ------------------------------------------------------------ chữ và link có sẵn
+  // ------------------------------------------------------------ existing text and links
 
-  // texts: mảng chuỗi, mỗi chuỗi một mảnh giấy. at: điểm world (kéo-thả) hoặc không có (dán).
+  // texts: an array of strings, one note each. at: a world point (drag and drop) or none (paste).
   function createTexts(texts, at) {
     const list = texts.map((s) => s.replace(/\r\n?/g, '\n').trim()).filter(Boolean);
     if (!list.length) return [];
     const origin = at || pointerWorld();
     inter.endEdit();
     store.checkpoint();
-    const ids = list.map((t, i) => {
-      const wide = t.length > 360 || t.split('\n').length > 8;
+    const ids = list.map((text, i) => {
+      const wide = text.length > 360 || text.split('\n').length > 8;
       const w = wide ? 320 : NOTE_W;
       let x = origin.x - w / 2 + i * 30;
       let y = origin.y - 24 + i * 30;
       if (!at && i === 0) ({ x, y } = freeSpot(x, y));
-      return store.addNote({ x, y, w, t, r: tilt() }).id;
+      return store.addNote({ x, y, w, t: text, r: tilt() }).id;
     });
     inter.setSelection(ids);
     return ids;
   }
 
-  // ------------------------------------------------------------ ảnh
+  // ------------------------------------------------------------ images
 
   async function addImages(files, at) {
     const images = files.filter(isImageFile);
     if (!images.length) return 0;
-    ui.toast(images.length > 1 ? `Đang tải ${images.length} ảnh…` : 'Đang tải ảnh…', { ms: 20_000 });
+    ui.toast(t('toast.imagesLoading', { count: images.length }), { ms: 20_000 });
     const origin = at || pointerWorld();
     const made = [];
     let failed = '';
@@ -120,12 +121,12 @@ export function createCapture({ board, view, layer, inter, ui, dockEl }) {
       }
     }
     if (made.length) inter.setSelection(made);
-    if (failed) ui.toast(`Không thêm được ảnh: ${failed}`, { ms: 6000 });
-    else ui.toast(made.length > 1 ? `Đã thêm ${made.length} ảnh` : 'Đã thêm ảnh', { ms: 1800 });
+    if (failed) ui.toast(t('toast.imageAddFailed', { message: failed }), { ms: 6000 });
+    else ui.toast(t('toast.imagesAdded', { count: made.length }), { ms: 1800 });
     return made.length;
   }
 
-  // Tệp thả từ ngoài vào: ảnh, shortcut .url, tệp chữ nhỏ.
+  // Files dropped from outside: images, .url shortcuts, small text files.
   async function addFiles(files, at) {
     const images = [];
     const texts = [];
@@ -146,17 +147,17 @@ export function createCapture({ board, view, layer, inter, ui, dockEl }) {
     }
     if (texts.length) createTexts(texts, at);
     if (images.length) await addImages(images, texts.length ? { x: at.x, y: at.y + 150 } : at);
-    if (skipped) ui.toast(`Bỏ qua ${skipped} tệp: chỉ nhận ảnh, shortcut .url và tệp chữ nhỏ`, { ms: 5000 });
+    if (skipped) ui.toast(t('toast.filesSkipped', { count: skipped }), { ms: 5000 });
   }
 
-  // ------------------------------------------------------------ dán (Ctrl+V)
+  // ------------------------------------------------------------ paste (Ctrl+V)
 
   document.addEventListener('paste', (e) => {
     const cd = e.clipboardData;
     if (!cd || ui.blocking()) return;
     const files = [...cd.files].filter(isImageFile);
     const text = cd.getData('text/plain');
-    // Đang gõ chữ trong ô nhập: dán chữ như bình thường.
+    // Typing in a text box: paste text as usual.
     if (isTextField(e.target) && (!files.length || text)) return;
     if (!files.length && !text.trim()) return;
     e.preventDefault();
@@ -164,7 +165,7 @@ export function createCapture({ board, view, layer, inter, ui, dockEl }) {
     else addImages(files);
   });
 
-  // ------------------------------------------------------------ kéo-thả từ ngoài vào
+  // ------------------------------------------------------------ drag and drop from outside
 
   board.addEventListener('dragover', (e) => {
     if (e.target.closest?.('textarea')) return;
@@ -194,7 +195,7 @@ export function createCapture({ board, view, layer, inter, ui, dockEl }) {
   });
   window.addEventListener('dragend', () => board.classList.remove('dropping'));
 
-  // ------------------------------------------------------------ khay giấy
+  // ------------------------------------------------------------ the note tray
 
   function beginDockDrag(e, pad) {
     if (e.button !== 0) return;
@@ -213,7 +214,7 @@ export function createCapture({ board, view, layer, inter, ui, dockEl }) {
 
     const start = { x: e.clientX, y: e.clientY };
     let moved = false;
-    try { pad.setPointerCapture(e.pointerId); } catch { /* bỏ qua */ }
+    try { pad.setPointerCapture(e.pointerId); } catch { /* ignore */ }
 
     const place = (x, y) => {
       ghost.style.transform = `translate(${x - NOTE_W / 2}px, ${y - NOTE_H / 2}px) scale(${scale}) rotate(${r}deg)`;
@@ -230,17 +231,17 @@ export function createCapture({ board, view, layer, inter, ui, dockEl }) {
       pad.removeEventListener('pointerup', onUp);
       pad.removeEventListener('pointercancel', cleanup);
       window.removeEventListener('keydown', onKey, true);
-      try { pad.releasePointerCapture(e.pointerId); } catch { /* bỏ qua */ }
+      try { pad.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
       ghost.remove();
     };
     const onUp = (ev) => {
       cleanup();
       if (!moved) {
-        createAtCenter(color); // chỉ bấm, không kéo: đặt giữa màn hình
+        createAtCenter(color); // clicked without dragging: place it in the middle of the screen
         return;
       }
       const under = document.elementFromPoint(ev.clientX, ev.clientY);
-      if (!under || !board.contains(under)) return; // thả lên thanh công cụ hoặc ra ngoài: hủy
+      if (!under || !board.contains(under)) return; // dropped on a toolbar or outside the board: cancel
       const p = view.toWorld(ev.clientX, ev.clientY);
       createBlank({ cx: p.x, cy: p.y, color, r, exact: true });
     };
@@ -258,7 +259,7 @@ export function createCapture({ board, view, layer, inter, ui, dockEl }) {
 
   for (const pad of dockEl.querySelectorAll('.pad')) {
     pad.addEventListener('pointerdown', (e) => beginDockDrag(e, pad));
-    // Phím Enter/Space trên nút (bàn phím): đặt giấy giữa màn hình.
+    // Enter/Space on the button (keyboard): place the note in the middle of the screen.
     pad.addEventListener('click', (e) => {
       if (e.detail === 0) createAtCenter(pad.dataset.color);
     });

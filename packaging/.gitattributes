@@ -1,0 +1,6 @@
+# Keep these files byte-for-byte as written, whatever the checkout's line-ending settings:
+# shell scripts and Debian control files break with CRLF, and the build scripts expect LF templates.
+* text eol=lf
+
+# Not needed by someone who just wants the source archive GitHub generates for a tag.
+* export-ignore

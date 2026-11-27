@@ -1,13 +1,13 @@
-// Kho dữ liệu: các mảnh giấy, thùng rác, hoàn tác/làm lại và tự động lưu.
+// The data store: notes, trash, undo/redo and autosave.
 //
-// Mọi thay đổi đi qua các hàm ở file này để luôn: cập nhật `mt` (thời điểm sửa, dùng khi gộp),
-// đánh dấu "chưa lưu", và phát sự kiện cho giao diện vẽ lại.
+// Every change goes through the functions in this file so that they always: update `mt`
+// (the last-modified time, used when merging), mark the board "unsaved", and emit an event for the UI to redraw.
 //
-// Sự kiện:
+// Events:
 //   'notes'  { changed?: id[], removed?: id[], reset?: true }
-//   'trash'  (thùng rác thay đổi)
+//   'trash'  (the trash changed)
 //   'status' 'loading' | 'saved' | 'pending' | 'saving' | 'error'
-//   'merged' (vừa gộp thay đổi từ cửa sổ khác)
+//   'merged' (changes from another window were just merged in)
 
 import { api } from './api.js';
 import { mergeBoards } from './merge.js';
@@ -36,7 +36,7 @@ export const state = {
 
 export const getNote = (id) => state.notes.get(id);
 
-// ---------------------------------------------------------------- chuẩn hóa
+// ---------------------------------------------------------------- normalising
 
 const num = (v, fallback) => (v !== null && v !== '' && Number.isFinite(+v) ? +v : fallback);
 
@@ -67,7 +67,7 @@ export function normalizeNote(raw) {
   return n;
 }
 
-// Bỏ các trường mặc định để file lưu gọn.
+// Drop fields that hold their default value to keep the saved file small.
 function compact(n) {
   const o = { ...n };
   if (!o.lock) delete o.lock;
@@ -109,7 +109,7 @@ export function serialize() {
 
 const snapshot = () => JSON.stringify(serialize());
 
-// ---------------------------------------------------------------- lưu
+// ---------------------------------------------------------------- saving
 
 const PENDING_KEY = 'stick-note:pending';
 let dirty = false;
@@ -137,10 +137,10 @@ function touch() {
 function writePending() {
   try {
     localStorage.setItem(PENDING_KEY, JSON.stringify({ at: Date.now(), board: serialize() }));
-  } catch { /* localStorage đầy hoặc bị chặn: bỏ qua */ }
+  } catch { /* localStorage is full or blocked: ignore */ }
 }
 function clearPending() {
-  try { localStorage.removeItem(PENDING_KEY); } catch { /* bỏ qua */ }
+  try { localStorage.removeItem(PENDING_KEY); } catch { /* ignore */ }
 }
 function readPending() {
   try {
@@ -160,7 +160,7 @@ export async function flush() {
   try {
     const res = await api.putBoard(state.rev, serialize());
     if (res.conflict) {
-      // Cửa sổ khác đã lưu trước: gộp theo từng mảnh giấy rồi lưu lại bản gộp.
+      // Another window saved first: merge note by note, then save the merged board.
       const merged = mergeBoards(serialize(), res.board);
       state.rev = res.rev;
       setData(merged.notes, merged.trash);
@@ -191,18 +191,18 @@ export async function flush() {
   }
 }
 
-// Gọi khi đóng cửa sổ: lưu nốt nếu còn dở, và để lại bản dự phòng trong trình duyệt.
+// Called when the window closes: save whatever is pending and leave a safety copy in the browser.
 export function flushOnExit() {
   if (!dirty && !saving) return;
   writePending();
   try {
     api.putBoard(state.rev, serialize(), { keepalive: true }).catch(() => {});
-  } catch { /* body quá lớn cho keepalive: đã có bản dự phòng */ }
+  } catch { /* body too large for keepalive: the safety copy above covers it */ }
 }
 
 export const isDirty = () => dirty || saving;
 
-// ---------------------------------------------------------------- nạp
+// ---------------------------------------------------------------- loading
 
 function purgeOldTrash() {
   const cutoff = Date.now() - TRASH_KEEP_DAYS * 86_400_000;
@@ -219,7 +219,7 @@ export async function load() {
   state.rev = rev;
   setData(board.notes || [], board.trash || []);
 
-  // Lần trước đóng cửa sổ khi chưa lưu kịp (hoặc server đang tắt): gộp lại phần dở dang.
+  // The last window closed before it could save (or the server was down): merge the unsaved work back in.
   const pending = readPending();
   if (pending && pending.board && Date.now() - (pending.at || 0) < 30 * 86_400_000) {
     const merged = mergeBoards(pending.board, serialize());
@@ -234,7 +234,7 @@ export async function load() {
   emit('trash');
 }
 
-// Khi cửa sổ được focus lại: nếu cửa sổ khác đã lưu thay đổi thì nạp bản mới.
+// When the window regains focus: if another window saved changes, load the newer board.
 export async function checkRemote() {
   if (dirty || saving) return;
   try {
@@ -246,10 +246,10 @@ export async function checkRemote() {
     setData(res.board.notes || [], res.board.trash || []);
     emit('notes', { reset: true });
     emit('trash');
-  } catch { /* mất kết nối: lần lưu kế tiếp sẽ báo lỗi */ }
+  } catch { /* offline: the next save will report it */ }
 }
 
-// ---------------------------------------------------------------- hoàn tác
+// ---------------------------------------------------------------- undo
 
 const undoStack = [];
 let redoStack = [];
@@ -277,7 +277,7 @@ function travel(from, to) {
   const before = fingerprints();
   const data = JSON.parse(from.pop());
   setData(data.notes, data.trash);
-  // Mảnh giấy nào vừa quay về trạng thái cũ thì tính là mới sửa, để thắng khi gộp với cửa sổ khác.
+  // A note that just returned to an earlier state counts as freshly edited, so it wins when merged with another window.
   const now = Date.now();
   for (const [id, fp] of fingerprints()) {
     if (before.get(id) === fp) continue;
@@ -292,7 +292,7 @@ function travel(from, to) {
 export const undo = () => travel(undoStack, redoStack);
 export const redo = () => travel(redoStack, undoStack);
 
-// ---------------------------------------------------------------- thay đổi
+// ---------------------------------------------------------------- changes
 
 export function addNote(fields) {
   const now = Date.now();
@@ -340,7 +340,7 @@ export function moveNotes(positions) {
   }
 }
 
-// Đưa lên trên cùng khi chạm vào. Không tính là một bước hoàn tác.
+// Bring to the front when touched. This is not an undo step.
 export function bringToFront(ids) {
   const list = ids.map((id) => state.notes.get(id)).filter(Boolean).sort((a, b) => a.z - b.z);
   if (!list.length) return;
@@ -354,7 +354,7 @@ export function bringToFront(ids) {
   emit('notes', { changed: list.map((n) => n.id) });
 }
 
-// Bỏ vào thùng rác (khôi phục được).
+// Move to the trash (can be restored).
 export function removeNotes(ids) {
   const now = Date.now();
   const removed = [];
@@ -372,7 +372,7 @@ export function removeNotes(ids) {
   }
 }
 
-// Xóa hẳn, không qua thùng rác. Chỉ dùng cho mảnh giấy vừa tạo mà để trống.
+// Delete outright, bypassing the trash. Only used for a note that was just created and left empty.
 export function discardNote(id) {
   if (!state.notes.delete(id)) return;
   touch();
@@ -393,7 +393,7 @@ export function restoreNote(id) {
   return n;
 }
 
-// ids = undefined: dọn sạch cả thùng rác.
+// ids = undefined: empty the whole trash.
 export function purgeTrash(ids) {
   const before = state.trash.length;
   state.trash = ids ? state.trash.filter((n) => !ids.includes(n.id)) : [];

@@ -1,4 +1,4 @@
-// Bộ biểu tượng SVG nét mảnh (viết sẵn, không dùng emoji). Chỉ chứa chuỗi tĩnh do mình viết nên dùng innerHTML là an toàn.
+// A set of thin-line SVG icons (hand-written, no emoji). They are static strings we wrote ourselves, so innerHTML is safe here.
 
 const PATHS = {
   copy: '<rect x="8.5" y="8.5" width="12" height="12" rx="2.4"/><path d="M5.3 15.5h-.5A1.8 1.8 0 0 1 3 13.7V5.8A1.8 1.8 0 0 1 4.8 4h7.9a1.8 1.8 0 0 1 1.8 1.8v.5"/>',
@@ -25,6 +25,8 @@ const PATHS = {
   image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>',
   moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
   tilt: '<rect x="5" y="6" width="14" height="12" rx="1.5" transform="rotate(-8 12 12)"/>',
+  globe: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+  power: '<path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/>',
 };
 
 const cache = new Map();
@@ -42,7 +44,7 @@ export function icon(name, size = 18) {
   return tpl.content.firstElementChild.cloneNode(true);
 }
 
-// Thay mọi <span data-icon="tên" data-size="18"> trong HTML bằng biểu tượng thật.
+// Replace every <span data-icon="name" data-size="18"> in the HTML with the real icon.
 export function hydrateIcons(root = document) {
   for (const el of root.querySelectorAll('[data-icon]')) {
     el.replaceChildren(icon(el.dataset.icon, Number(el.dataset.size) || 18));

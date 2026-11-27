@@ -1,0 +1,52 @@
+.TH STICK-NOTE 1 "{{date}}" "Stick Note {{version}}" "User Commands"
+.SH NAME
+stick-note \- a personal whiteboard of sticky notes
+.SH SYNOPSIS
+.B stick-note
+[\fIoption\fR]
+.SH DESCRIPTION
+.B stick-note
+opens Stick Note: one endless whiteboard on which you stick notes made of text,
+links and pictures. Where you put a note is how you find it again.
+.PP
+The first run starts a small background server on 127.0.0.1 and opens the board in
+its own window when Chrome, Chromium, Edge or Brave is installed, or in the default
+browser otherwise. The server quits by itself a few minutes after the last window
+has been closed. Nothing leaves your computer.
+.SH OPTIONS
+.TP
+.B \-\-stop
+Ask a running Stick Note to quit.
+.TP
+.B \-\-version
+Print the version and exit.
+.TP
+.B \-\-data\-dir
+Print the folder where the notes are stored and exit.
+.TP
+.B \-\-help
+Print a short help text and exit.
+.SH FILES
+.TP
+.I ~/.local/share/stick-note
+Your notes (board.json), pictures and daily backups. The directory named by
+.B XDG_DATA_HOME
+is used instead when that variable is set. Removing the package never deletes it.
+.SH ENVIRONMENT
+.TP
+.B PORT
+TCP port of the local server (default 4747).
+.TP
+.B STICK_NOTE_DATA
+Store the notes in this folder instead.
+.TP
+.B STICK_NOTE_BROWSER
+Path of the Chromium-based browser used for the app window.
+.TP
+.B STICK_NOTE_NO_OPEN
+When set, print the address instead of opening a window.
+.TP
+.B STICK_NOTE_IDLE_MS
+Milliseconds without an open window before the background server quits (default 300000).
+.SH SEE ALSO
+{{homepage}}

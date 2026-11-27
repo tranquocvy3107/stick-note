@@ -1,7 +1,7 @@
-// Gộp hai phiên bản của bảng, ví dụ khi bạn mở hai cửa sổ cùng lúc hoặc khôi phục dữ liệu chưa lưu.
-// Quy tắc: với mỗi mảnh giấy (theo id) lấy bản được sửa muộn hơn (mt).
-// Mảnh giấy nằm trong thùng rác tính theo thời điểm xóa (cũng được ghi vào mt).
-// Không có mảnh giấy nào bị mất: cái gì chỉ có ở một phía thì được giữ nguyên.
+// Merge two versions of the board, e.g. when two windows are open at once or unsaved work is recovered.
+// Rule: for each note (by id) keep the copy that was edited later (mt).
+// A note in the trash is dated by when it was deleted (also stored in mt).
+// No note is ever lost: anything present on only one side is kept.
 
 export function mergeBoards(local, remote) {
   const picked = new Map();

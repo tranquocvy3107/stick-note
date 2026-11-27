@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="vi">
+<html lang="en" data-i18n-pending>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -12,166 +12,136 @@
   <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
-  <main id="board" class="board" aria-label="Bảng ghi chú">
+  <!-- Every visible text below is English; js/i18n.js swaps it for the user's language at start-up
+       (data-i18n* attributes name the keys in /locales/*.json). -->
+  <main id="board" class="board" data-i18n-aria-label="board.label" aria-label="Notes board">
     <div id="world"></div>
   </main>
   <div id="marquee" class="marquee" hidden></div>
 
   <div id="hint" class="hint" hidden>
     <div class="hint-card">
-      <h1>Bảng còn trống</h1>
-      <p>Kéo một mảnh giấy ở góc dưới bên trái vào đây, rồi ghi chữ hoặc link.</p>
+      <h1 data-i18n="hint.title">The board is empty</h1>
+      <p data-i18n="hint.lead">Drag a paper slip from the bottom-left corner onto the board, then write some text or a link.</p>
       <ul>
-        <li>Nhấp đúp lên bảng để tạo giấy mới tại chỗ đó</li>
-        <li><kbd>Ctrl</kbd> <kbd>V</kbd> để dán chữ, link hoặc ảnh chụp màn hình</li>
-        <li>Kéo link, ảnh từ nơi khác thả thẳng vào bảng</li>
+        <li data-i18n="hint.tip.dblclick">Double-click the board to make a new note right there</li>
+        <li data-i18n="hint.tip.paste"><kbd>Ctrl</kbd> <kbd>V</kbd> pastes text, a link or a screenshot</li>
+        <li data-i18n="hint.tip.drop">Drag links and images from anywhere and drop them on the board</li>
       </ul>
     </div>
   </div>
 
   <div id="status" class="status" data-state="loading" role="status">
-    <span class="dot"></span><span id="status-text">Đang mở…</span>
+    <span class="dot"></span><span id="status-text">Opening…</span>
   </div>
 
-  <div id="topbar" class="cluster topbar" role="toolbar" aria-label="Điều khiển bảng">
-    <button class="ibtn" id="btn-search" type="button" title="Tìm (Ctrl+F)" aria-label="Tìm"><span data-icon="search"></span></button>
+  <div id="topbar" class="cluster topbar" role="toolbar" data-i18n-aria-label="toolbar.label" aria-label="Board controls">
+    <button class="ibtn" id="btn-search" type="button" data-i18n-title="search.title" data-i18n-aria-label="search.label" title="Search (Ctrl+F)" aria-label="Search"><span data-icon="search"></span></button>
     <span class="sep"></span>
-    <button class="ibtn" id="btn-fit" type="button" title="Xem tất cả mảnh giấy (Shift+1)" aria-label="Xem tất cả mảnh giấy"><span data-icon="fit"></span></button>
-    <button class="ibtn" id="btn-home" type="button" title="Về vị trí gốc (Home)" aria-label="Về vị trí gốc"><span data-icon="home"></span></button>
+    <button class="ibtn" id="btn-fit" type="button" data-i18n-title="view.fit.title" data-i18n-aria-label="view.fit.label" title="Show all notes (Shift+1)" aria-label="Show all notes"><span data-icon="fit"></span></button>
+    <button class="ibtn" id="btn-home" type="button" data-i18n-title="view.home.title" data-i18n-aria-label="view.home.label" title="Back to the start (Home)" aria-label="Back to the start"><span data-icon="home"></span></button>
     <span class="sep"></span>
-    <button class="ibtn" id="btn-zoom-out" type="button" title="Thu nhỏ (Ctrl và -)" aria-label="Thu nhỏ"><span data-icon="minus"></span></button>
-    <button class="zoom-label" id="zoom-label" type="button" title="Về 100% (Ctrl+0)">100%</button>
-    <button class="ibtn" id="btn-zoom-in" type="button" title="Phóng to (Ctrl và +)" aria-label="Phóng to"><span data-icon="plus"></span></button>
+    <button class="ibtn" id="btn-zoom-out" type="button" data-i18n-title="view.zoomOut.title" data-i18n-aria-label="view.zoomOut.label" title="Zoom out (Ctrl and -)" aria-label="Zoom out"><span data-icon="minus"></span></button>
+    <button class="zoom-label" id="zoom-label" type="button" data-i18n-title="view.zoomReset.title" title="Reset to 100% (Ctrl+0)">100%</button>
+    <button class="ibtn" id="btn-zoom-in" type="button" data-i18n-title="view.zoomIn.title" data-i18n-aria-label="view.zoomIn.label" title="Zoom in (Ctrl and +)" aria-label="Zoom in"><span data-icon="plus"></span></button>
     <span class="sep"></span>
-    <button class="ibtn" id="btn-menu" type="button" title="Menu" aria-haspopup="true" aria-expanded="false" aria-label="Menu"><span data-icon="more"></span></button>
+    <button class="ibtn" id="btn-menu" type="button" data-i18n-title="menu.title" data-i18n-aria-label="menu.title" title="Menu" aria-haspopup="true" aria-expanded="false" aria-label="Menu"><span data-icon="more"></span></button>
   </div>
 
   <div id="searchbar" class="cluster searchbar" role="search" hidden>
     <span class="si" data-icon="search" data-size="16"></span>
-    <input id="search-input" type="search" placeholder="Tìm trong các mảnh giấy…" autocomplete="off" spellcheck="false" aria-label="Tìm trong các mảnh giấy">
+    <input id="search-input" type="search" data-i18n-placeholder="search.placeholder" data-i18n-aria-label="search.inputLabel" placeholder="Search your notes…" autocomplete="off" spellcheck="false" aria-label="Search your notes">
     <span id="search-count" class="count" aria-live="polite"></span>
-    <button class="ibtn" id="search-prev" type="button" title="Kết quả trước (Shift+Enter)" aria-label="Kết quả trước"><span data-icon="up" data-size="16"></span></button>
-    <button class="ibtn" id="search-next" type="button" title="Kết quả sau (Enter)" aria-label="Kết quả sau"><span data-icon="down" data-size="16"></span></button>
-    <button class="ibtn" id="search-close" type="button" title="Đóng (Esc)" aria-label="Đóng tìm kiếm"><span data-icon="close" data-size="16"></span></button>
+    <button class="ibtn" id="search-prev" type="button" data-i18n-title="search.prev" data-i18n-aria-label="search.prevLabel" title="Previous result (Shift+Enter)" aria-label="Previous result"><span data-icon="up" data-size="16"></span></button>
+    <button class="ibtn" id="search-next" type="button" data-i18n-title="search.next" data-i18n-aria-label="search.nextLabel" title="Next result (Enter)" aria-label="Next result"><span data-icon="down" data-size="16"></span></button>
+    <button class="ibtn" id="search-close" type="button" data-i18n-title="search.close" data-i18n-aria-label="search.closeLabel" title="Close (Esc)" aria-label="Close search"><span data-icon="close" data-size="16"></span></button>
   </div>
 
   <div id="menu" class="popover menu" role="menu" hidden>
-    <button type="button" role="menuitem" data-act="fit"><span data-icon="fit" data-size="17"></span><span class="grow">Xem tất cả mảnh giấy</span><kbd>Shift 1</kbd></button>
-    <button type="button" role="menuitem" data-act="home"><span data-icon="home" data-size="17"></span><span class="grow">Về vị trí gốc</span><kbd>Home</kbd></button>
+    <button type="button" role="menuitem" data-act="fit"><span data-icon="fit" data-size="17"></span><span class="grow" data-i18n="menu.fit">Show all notes</span><kbd>Shift 1</kbd></button>
+    <button type="button" role="menuitem" data-act="home"><span data-icon="home" data-size="17"></span><span class="grow" data-i18n="menu.home">Back to the start</span><kbd>Home</kbd></button>
     <hr>
-    <button type="button" role="menuitemcheckbox" data-act="tilt" aria-checked="true"><span data-icon="tilt" data-size="17"></span><span class="grow">Giấy nghiêng nhẹ</span><span class="switch" aria-hidden="true"></span></button>
-    <button type="button" role="menuitem" data-act="theme"><span data-icon="moon" data-size="17"></span><span class="grow">Giao diện</span><b id="theme-label">Tự động</b></button>
+    <button type="button" role="menuitemcheckbox" data-act="tilt" aria-checked="true"><span data-icon="tilt" data-size="17"></span><span class="grow" data-i18n="menu.tilt">Slightly tilted notes</span><span class="switch" aria-hidden="true"></span></button>
+    <button type="button" role="menuitem" data-act="theme"><span data-icon="moon" data-size="17"></span><span class="grow" data-i18n="menu.theme">Appearance</span><b id="theme-label">Auto</b></button>
+    <button type="button" role="menuitem" data-act="language"><span data-icon="globe" data-size="17"></span><span class="grow" data-i18n="menu.language">Language</span><b id="lang-label">Auto</b></button>
     <hr>
-    <button type="button" role="menuitem" data-act="folder"><span data-icon="folder" data-size="17"></span><span class="grow">Mở thư mục dữ liệu</span></button>
-    <button type="button" role="menuitem" data-act="backup"><span data-icon="archive" data-size="17"></span><span class="grow">Sao lưu ngay</span></button>
+    <button type="button" role="menuitem" data-act="folder"><span data-icon="folder" data-size="17"></span><span class="grow" data-i18n="menu.folder">Open data folder</span></button>
+    <button type="button" role="menuitem" data-act="backup"><span data-icon="archive" data-size="17"></span><span class="grow" data-i18n="menu.backup">Back up now</span></button>
     <hr>
-    <button type="button" role="menuitem" data-act="help"><span data-icon="help" data-size="17"></span><span class="grow">Hướng dẫn và phím tắt</span><kbd>?</kbd></button>
+    <button type="button" role="menuitem" data-act="help"><span data-icon="help" data-size="17"></span><span class="grow" data-i18n="menu.help">Help and shortcuts</span><kbd>?</kbd></button>
+    <button type="button" role="menuitem" data-act="quit"><span data-icon="power" data-size="17"></span><span class="grow" data-i18n="menu.quit">Quit Stick Note</span></button>
     <div class="menu-foot" id="menu-foot"></div>
   </div>
 
-  <div id="dock" class="cluster dock" role="group" aria-label="Khay giấy: kéo một tờ vào bảng">
-    <button type="button" class="pad" data-color="yellow" title="Kéo vào bảng để dán giấy vàng" aria-label="Giấy vàng"></button>
-    <button type="button" class="pad" data-color="pink" title="Kéo vào bảng để dán giấy hồng" aria-label="Giấy hồng"></button>
-    <button type="button" class="pad" data-color="blue" title="Kéo vào bảng để dán giấy xanh dương" aria-label="Giấy xanh dương"></button>
-    <button type="button" class="pad" data-color="green" title="Kéo vào bảng để dán giấy xanh lá" aria-label="Giấy xanh lá"></button>
-    <button type="button" class="pad" data-color="orange" title="Kéo vào bảng để dán giấy cam" aria-label="Giấy cam"></button>
-    <button type="button" class="pad" data-color="purple" title="Kéo vào bảng để dán giấy tím" aria-label="Giấy tím"></button>
-    <button type="button" class="pad" data-color="white" title="Kéo vào bảng để dán giấy trắng" aria-label="Giấy trắng"></button>
+  <div id="dock" class="cluster dock" role="group" data-i18n-aria-label="dock.label" aria-label="Note tray: drag one onto the board">
+    <button type="button" class="pad" data-color="yellow"></button>
+    <button type="button" class="pad" data-color="pink"></button>
+    <button type="button" class="pad" data-color="blue"></button>
+    <button type="button" class="pad" data-color="green"></button>
+    <button type="button" class="pad" data-color="orange"></button>
+    <button type="button" class="pad" data-color="purple"></button>
+    <button type="button" class="pad" data-color="white"></button>
   </div>
 
-  <button id="trash" class="trash" type="button" title="Thùng rác. Kéo mảnh giấy vào đây để bỏ." aria-label="Thùng rác">
+  <button id="trash" class="trash" type="button" data-i18n-title="trash.button" data-i18n-aria-label="trash.label" title="Trash. Drag a note here to remove it." aria-label="Trash">
     <span data-icon="trash" data-size="22"></span>
     <span id="trash-badge" class="badge" hidden>0</span>
   </button>
 
-  <aside id="drawer" class="drawer" aria-label="Thùng rác" hidden>
+  <aside id="drawer" class="drawer" data-i18n-aria-label="trash.title" aria-label="Trash" hidden>
     <header>
-      <h2>Thùng rác</h2>
-      <button id="drawer-close" class="ibtn" type="button" aria-label="Đóng thùng rác"><span data-icon="close"></span></button>
+      <h2 data-i18n="trash.title">Trash</h2>
+      <button id="drawer-close" class="ibtn" type="button" data-i18n-aria-label="trash.close" aria-label="Close the trash"><span data-icon="close"></span></button>
     </header>
-    <p class="drawer-note">Mảnh giấy bị bỏ vào đây được giữ 60 ngày rồi mới mất hẳn.</p>
+    <p class="drawer-note" id="drawer-note"></p>
     <div id="drawer-list" class="drawer-list"></div>
     <footer>
-      <button id="drawer-empty" class="btn ghost-danger" type="button">Dọn sạch thùng rác</button>
+      <button id="drawer-empty" class="btn ghost-danger" type="button" data-i18n="trash.empty">Empty the trash</button>
     </footer>
   </aside>
 
-  <div id="banner" class="banner" role="alert" hidden>
-    <b>Mất kết nối với máy chủ.</b> Ghi chú của bạn đang được giữ tạm trong cửa sổ này. Hãy mở lại Stick Note bằng <b>start.bat</b>, cửa sổ này sẽ tự lưu lại khi kết nối trở lại.
+  <div id="banner" class="banner" role="alert" data-i18n="banner.lost" hidden>
+    <b>Lost connection to the server.</b> Your notes are being kept in this window. Open Stick Note again from its shortcut; this window saves them as soon as the connection is back.
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
   <div id="lightbox" class="lightbox" hidden>
     <div class="lb-bar">
-      <button id="lb-copy" class="btn light" type="button"><span data-icon="copy" data-size="16"></span>Copy ảnh</button>
-      <a id="lb-open" class="btn light" target="_blank" rel="noopener noreferrer"><span data-icon="external" data-size="16"></span>Mở ở tab mới</a>
-      <button id="lb-close" class="ibtn light" type="button" aria-label="Đóng"><span data-icon="close"></span></button>
+      <button id="lb-copy" class="btn light" type="button"><span data-icon="copy" data-size="16"></span><span data-i18n="lightbox.copy">Copy image</span></button>
+      <a id="lb-open" class="btn light" target="_blank" rel="noopener noreferrer"><span data-icon="external" data-size="16"></span><span data-i18n="lightbox.open">Open in a new tab</span></a>
+      <button id="lb-close" class="ibtn light" type="button" data-i18n-aria-label="lightbox.close" aria-label="Close"><span data-icon="close"></span></button>
     </div>
     <img id="lb-img" alt="">
     <p id="lb-caption"></p>
   </div>
 
-  <div id="help" class="modal" role="dialog" aria-modal="true" aria-label="Hướng dẫn và phím tắt" hidden>
+  <div id="help" class="modal" role="dialog" aria-modal="true" data-i18n-aria-label="help.title" aria-label="Help and shortcuts" hidden>
     <div class="modal-card">
       <header>
-        <h2>Hướng dẫn và phím tắt</h2>
-        <button id="help-close" class="ibtn" type="button" aria-label="Đóng"><span data-icon="close"></span></button>
+        <h2 data-i18n="help.title">Help and shortcuts</h2>
+        <button id="help-close" class="ibtn" type="button" data-i18n-aria-label="help.close" aria-label="Close"><span data-icon="close"></span></button>
       </header>
-      <div class="help-grid">
-        <section>
-          <h3>Thêm giấy</h3>
-          <dl>
-            <dt>Kéo từ khay</dt><dd>Kéo tờ giấy ở góc dưới bên trái vào bảng rồi gõ</dd>
-            <dt>Nhấp đúp nền</dt><dd>Tạo giấy mới ngay chỗ đó</dd>
-            <dt><kbd>N</kbd></dt><dd>Tạo giấy tại con trỏ</dd>
-            <dt><kbd>Ctrl</kbd> <kbd>V</kbd></dt><dd>Dán chữ, link hoặc ảnh thành giấy mới</dd>
-            <dt>Kéo thả vào</dt><dd>Link, ảnh, file .url hoặc .txt từ nơi khác</dd>
-          </dl>
-        </section>
-        <section>
-          <h3>Với một mảnh giấy</h3>
-          <dl>
-            <dt>Nhấp đúp / <kbd>Enter</kbd></dt><dd>Sửa chữ. <kbd>Esc</kbd> hoặc nhấp ra ngoài là xong</dd>
-            <dt>Kéo</dt><dd>Di chuyển. Kéo vào thùng rác để bỏ</dd>
-            <dt>Kéo góc dưới phải</dt><dd>Đổi kích thước</dd>
-            <dt>Bấm link</dt><dd>Mở ở tab mới. Nút nhỏ bên cạnh để copy link</dd>
-            <dt><kbd>Ctrl</kbd> <kbd>C</kbd></dt><dd>Copy nội dung mảnh giấy đang chọn</dd>
-            <dt>Ghim</dt><dd>Khóa vị trí để không kéo nhầm</dd>
-            <dt><kbd>Delete</kbd></dt><dd>Bỏ vào thùng rác (giữ 60 ngày)</dd>
-          </dl>
-        </section>
-        <section>
-          <h3>Di chuyển trên bảng</h3>
-          <dl>
-            <dt>Kéo nền</dt><dd>Di chuyển bảng. Cũng được: cuộn chuột, phím mũi tên, giữ <kbd>Space</kbd> rồi kéo</dd>
-            <dt><kbd>Ctrl</kbd> + cuộn</dt><dd>Phóng to, thu nhỏ (hoặc <kbd>Ctrl</kbd> <kbd>+</kbd> / <kbd>-</kbd>)</dd>
-            <dt><kbd>Home</kbd></dt><dd>Về vị trí gốc, 100%</dd>
-            <dt><kbd>Shift</kbd> <kbd>1</kbd></dt><dd>Xem tất cả mảnh giấy</dd>
-            <dt><kbd>Ctrl</kbd> <kbd>F</kbd> hoặc <kbd>/</kbd></dt><dd>Tìm. Mảnh khớp sáng lên, vị trí không đổi</dd>
-          </dl>
-        </section>
-        <section>
-          <h3>Chọn nhiều và hoàn tác</h3>
-          <dl>
-            <dt><kbd>Shift</kbd> + kéo nền</dt><dd>Chọn nhiều mảnh theo vùng</dd>
-            <dt><kbd>Shift</kbd> + bấm</dt><dd>Thêm hoặc bớt một mảnh vào vùng chọn</dd>
-            <dt><kbd>Ctrl</kbd> <kbd>A</kbd></dt><dd>Chọn tất cả</dd>
-            <dt><kbd>Ctrl</kbd> <kbd>Z</kbd> / <kbd>Y</kbd></dt><dd>Hoàn tác / làm lại</dd>
-          </dl>
-        </section>
-      </div>
-      <p class="help-foot">Mọi thay đổi được lưu tự động vào máy bạn. Mỗi ngày có một bản sao lưu.</p>
+      <div class="help-grid" id="help-grid"></div>
+      <p class="help-foot" data-i18n="help.foot">Every change is saved automatically on your computer. A backup is made every day.</p>
     </div>
   </div>
 
   <div id="offline" class="overlay" hidden>
     <div class="overlay-card">
-      <h2>Chưa kết nối được máy chủ</h2>
-      <p>Stick Note cần chạy cùng một máy chủ nhỏ trên máy bạn. Hãy đóng cửa sổ này và mở lại bằng <b>start.bat</b>. Trang sẽ tự thử kết nối lại.</p>
+      <h2 data-i18n="offline.title">Can't reach the server yet</h2>
+      <p data-i18n="offline.body">Stick Note needs its small local server. Close this window and open Stick Note again from its shortcut. This page keeps trying to reconnect.</p>
     </div>
   </div>
 
+  <div id="stopped" class="overlay" hidden>
+    <div class="overlay-card">
+      <h2 data-i18n="stopped.title">Stick Note has stopped</h2>
+      <p data-i18n="stopped.body">You can close this window. Open Stick Note again from its shortcut whenever you need it.</p>
+    </div>
+  </div>
+
+  <noscript>Stick Note needs JavaScript. Please enable it in your browser.</noscript>
   <script type="module" src="/js/main.js"></script>
 </body>
 </html>

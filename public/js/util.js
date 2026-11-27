@@ -1,4 +1,4 @@
-// Tiện ích dùng chung. Không chạm vào DOM khi import, để test được bằng Node.
+// Shared helpers. Nothing here touches the DOM at import time, so it can be tested in Node.
 
 export const uid = () => 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 export const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -32,8 +32,8 @@ export function debounce(fn, ms) {
   return run;
 }
 
-// Sắp mảnh giấy theo thứ tự đọc: từng hàng từ trên xuống, trong mỗi hàng từ trái sang phải.
-// Các mảnh lệch nhau dưới `rowGap` px theo chiều dọc được coi là cùng một hàng (giấy dán tay hiếm khi thẳng hàng).
+// Order notes the way you read: row by row from the top, left to right within a row.
+// Notes whose tops differ by less than `rowGap` px count as one row (hand-placed notes are rarely aligned).
 export function readingOrder(notes, rowGap = 70) {
   const sorted = [...notes].sort((a, b) => a.y - b.y || a.x - b.x);
   const rows = [];
@@ -45,7 +45,7 @@ export function readingOrder(notes, rowGap = 70) {
   return rows.flatMap((r) => r.items.sort((a, b) => a.x - b.x));
 }
 
-// Bỏ dấu tiếng Việt và đưa về chữ thường để tìm kiếm: "Đường Hầm" -> "duong ham"
+// Strip diacritics and lowercase so search is forgiving: "Đường Hầm" -> "duong ham" (Vietnamese đ included).
 export function fold(s) {
   return String(s ?? '')
     .normalize('NFD')
@@ -59,7 +59,7 @@ export function fold(s) {
 
 const URL_RE = /(?:https?:\/\/|www\.)[^\s<>"'`]+/gi;
 
-// Cắt bỏ dấu câu ở cuối mà thường không thuộc về link: "xem https://a.com/x." -> "https://a.com/x"
+// Trim trailing punctuation that usually is not part of a link: "see https://a.com/x." -> "https://a.com/x"
 function trimUrl(url) {
   for (;;) {
     const last = url[url.length - 1];
@@ -81,7 +81,7 @@ function trimUrl(url) {
   }
 }
 
-// Tách văn bản thành các đoạn chữ thường và link.
+// Split text into plain-text parts and links.
 // -> [{ type: 'text', value }, { type: 'link', value, href }]
 export function splitLinks(text) {
   const out = [];
@@ -97,39 +97,43 @@ export function splitLinks(text) {
   return out;
 }
 
-// Hiển thị link gọn: bỏ giao thức và www, rút ngắn ở giữa nếu quá dài.
+// Show a link compactly: drop the protocol and www, and shorten the middle when it is very long.
 export function shortUrl(url) {
   let s = url.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/$/, '');
-  // Link tiếng Việt thường bị mã hóa (%E1%BB%87): hiện lại thành chữ cho dễ đọc. Link thật vẫn giữ nguyên.
-  try { s = decodeURI(s); } catch { /* mã hóa dở dang thì giữ nguyên */ }
+  // Non-English links are usually percent-encoded (%E1%BB%87): show them as readable text. The real link is unchanged.
+  try { s = decodeURI(s); } catch { /* a broken escape sequence: keep the text as it is */ }
   if (s.length > 46) s = `${s.slice(0, 32)}…${s.slice(-10)}`;
   return s;
 }
 
-// Chèn ký tự "cho phép xuống dòng" (U+200B) sau / ? & = _ . - để link dài xuống dòng ở chỗ tự nhiên
-// thay vì bị cắt giữa một chữ. Chỉ dùng cho phần hiển thị; link thật và nội dung copy không bị đổi.
+// Insert a zero-width space (U+200B) after / ? & = _ . - so long links wrap at natural places
+// instead of in the middle of a word. Display only: the real link and the copied text are unchanged.
 export function breakable(text) {
   return text.replace(/([/?&=_.-])(?=[^/?&=_.-])/g, '$1​');
 }
 
-// ---------------------------------------------------------------- thời gian
+// ---------------------------------------------------------------- time
 
-export function timeAgo(ts, now = Date.now()) {
-  const s = Math.max(0, Math.round((now - ts) / 1000));
-  if (s < 45) return 'vừa xong';
-  const m = Math.round(s / 60);
-  if (m < 60) return `${m} phút trước`;
-  const h = Math.round(m / 60);
-  if (h < 24) return `${h} giờ trước`;
-  const d = Math.round(h / 24);
-  if (d < 31) return `${d} ngày trước`;
-  const date = new Date(ts);
-  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+/**
+ * "just now", "5 minutes ago", "3 hours ago", "2 days ago", then a plain date.
+ * The words come from Intl, so they follow the interface language; `justNow` is the translated phrase for under 45 s.
+ */
+export function timeAgo(ts, { now = Date.now(), lang = 'en', justNow = 'just now' } = {}) {
+  const seconds = Math.max(0, Math.round((now - ts) / 1000));
+  if (seconds < 45) return justNow;
+  const rtf = new Intl.RelativeTimeFormat(lang, { numeric: 'auto' });
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return rtf.format(-minutes, 'minute');
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return rtf.format(-hours, 'hour');
+  const days = Math.round(hours / 24);
+  if (days < 31) return rtf.format(-days, 'day');
+  return new Intl.DateTimeFormat(lang, { dateStyle: 'medium' }).format(ts);
 }
 
 // ---------------------------------------------------------------- DOM
 
-// Tạo phần tử nhanh: h('div', { class: 'a', dataset: { id: 1 }, onclick: fn }, 'chữ', child)
+// Create an element quickly: h('div', { class: 'a', dataset: { id: 1 }, onclick: fn }, 'text', child)
 export function h(tag, props, ...kids) {
   const el = document.createElement(tag);
   for (const [key, value] of Object.entries(props || {})) {
@@ -150,7 +154,7 @@ export function isTextField(el) {
   return !!el && el.nodeType === 1 && (el.matches?.('input, textarea, select, [contenteditable="true"]') ?? false);
 }
 
-// Chép chữ vào clipboard, có phương án dự phòng khi trình duyệt từ chối Clipboard API.
+// Copy text to the clipboard, falling back to execCommand when the Clipboard API is refused.
 export async function writeClipboardText(text) {
   try {
     await navigator.clipboard.writeText(text);

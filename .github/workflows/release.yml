@@ -1,52 +1,112 @@
 name: Release
 
-# Phát hành tự động: đẩy một tag dạng vX.Y.Z lên GitHub là có bản phát hành mới.
-#   git tag v1.0.1
-#   git push origin v1.0.1
+# Publish a release by pushing a tag that matches the version in package.json:
+#   1. set "version" in package.json and add a "## [x.y.z]" section to CHANGELOG.md; commit and push to main
+#   2. git tag vX.Y.Z && git push origin vX.Y.Z
+# This workflow then checks the tag, runs the tests, builds and smoke-tests every package on Windows and
+# Linux, and publishes them with SHA256SUMS.txt and signed build attestations as a GitHub Release.
 
 on:
   push:
     tags: ['v*']
 
-permissions:
-  contents: write
+# Nothing by default; every job asks for exactly what it needs.
+permissions: {}
 
 jobs:
-  release:
-    name: Đóng gói và phát hành
+  verify:
+    name: Check the tag and run the tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
 
-      - name: Kiểm tra tag khớp với phiên bản trong package.json
+      - name: The tag must match the version in package.json
+        id: version
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          PKG="$(jq -r .version package.json)"
-          if [ "$VERSION" != "$PKG" ]; then
-            echo "Tag $GITHUB_REF_NAME không khớp version trong package.json ($PKG)."
+          set -euo pipefail
+          tag_version="${GITHUB_REF_NAME#v}"
+          package_version="$(jq -r .version package.json)"
+          if [ "$tag_version" != "$package_version" ]; then
+            echo "::error::The tag $GITHUB_REF_NAME does not match version $package_version in package.json"
             exit 1
           fi
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "version=$package_version" >> "$GITHUB_OUTPUT"
+
+      # Fail now rather than after twenty minutes of building.
+      - name: CHANGELOG.md must describe this version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: node tools/release-notes.mjs "$VERSION" > /dev/null
 
       - run: npm test
 
-      - name: Đóng gói
-        run: |
-          mkdir dist
-          git archive --format=zip --prefix="stick-note-${VERSION}/" -o "dist/stick-note-${VERSION}.zip" "$GITHUB_REF_NAME"
-          (cd dist && sha256sum "stick-note-${VERSION}.zip" > "stick-note-${VERSION}.zip.sha256")
-          node tools/release-notes.mjs "$VERSION" > dist/notes.md
+  package:
+    name: Build the packages
+    needs: verify
+    uses: ./.github/workflows/package.yml
+    permissions:
+      contents: read
 
-      - name: Tạo bản phát hành trên GitHub
-        env:
-          GH_TOKEN: ${{ github.token }}
+  publish:
+    name: Publish the release
+    needs: [verify, package]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write # create the release and upload its files
+      id-token: write # sign the build attestations
+      attestations: write # store the build attestations
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: packages-*
+          merge-multiple: true
+          path: dist
+
+      # Fails unless all five packages are there and nothing else is.
+      - name: Write SHA256SUMS.txt
+        run: node tools/package/checksums.mjs --require-all
+
+      - name: List what will be published
+        run: ls -l dist
+
+      # One attestation per file (checksums included) proves it was built by this repository's workflow:
+      #   gh attestation verify <file> --repo <owner>/stick-note
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*
+
+      - name: Create the GitHub release
         run: |
-          gh release create "$GITHUB_REF_NAME" \
-            "dist/stick-note-${VERSION}.zip" \
-            "dist/stick-note-${VERSION}.zip.sha256" \
-            --title "Stick Note ${VERSION}" \
-            --notes-file dist/notes.md \
-            --verify-tag
+          set -euo pipefail
+          node tools/release-notes.mjs "$VERSION" > "$RUNNER_TEMP/release-notes.md"
+          flags=()
+          if [[ "$VERSION" == *-* ]]; then flags+=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "Stick Note $VERSION" \
+            --notes-file "$RUNNER_TEMP/release-notes.md" \
+            --verify-tag \
+            "${flags[@]}"

@@ -1,0 +1,60 @@
+name: Bug report
+description: Something does not work the way it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. Please fill in what you can.
+        **Do not paste private notes or personal data.** For a security problem, do not use this form: see [SECURITY.md](https://github.com/tranquocvy3107/stick-note/blob/main/SECURITY.md).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead? Screenshots are welcome.
+    validations:
+      required: true
+  - type: dropdown
+    id: system
+    attributes:
+      label: Your computer
+      options:
+        - Windows 11
+        - Windows 10
+        - Ubuntu, Debian or Linux Mint
+        - Another Linux
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How did you install Stick Note?
+      options:
+        - Windows installer (setup.exe)
+        - Windows portable zip
+        - Linux .deb
+        - Linux AppImage
+        - Linux tar.gz
+        - Running from source
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Stick Note version
+      description: Shown at the bottom of the menu (the three dots), and in the name of the file you downloaded.
+      placeholder: "1.1.0"
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser used for the app window
+      description: Edge, Chrome, Chromium, Brave... or "default browser" if it opens in a tab.
+  - type: textarea
+    id: log
+    attributes:
+      label: Log lines (optional)
+      description: The last lines of `server.log` in your data folder (menu, then "Open data folder"), if they look relevant.
+      render: text
