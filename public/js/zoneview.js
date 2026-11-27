@@ -202,6 +202,9 @@ export function createZoneLayer(root, layer, view) {
     lookAll = false;
     lookIds.clear();
     const zones = sortSmallestFirst([...state.zones.values()]);
+    // A zone that was deleted, or is no longer private, forgets that it was opened (so undoing its deletion
+    // brings it back covered, as the owner left it before opening).
+    for (const id of revealedZones) if (!state.zones.get(id)?.p) revealedZones.delete(id);
     if (!zones.length && !hadZones) return;
     hadZones = zones.length > 0;
     const targets = everything ? layer.entries() : only.map((id) => [id, layer.get(id)]);
@@ -302,6 +305,7 @@ export function createZoneLayer(root, layer, view) {
     if (selected) updateFlip(els.get(selected));
   };
   view.onChange(() => {
+    if (selected) updateFlip(els.get(selected)); // panning can bring the zone's top edge to the top of the window
     const since = performance.now() - zkAt;
     if (since >= 100) applyZk();
     else if (!zkTimer) zkTimer = setTimeout(applyZk, 100 - since);

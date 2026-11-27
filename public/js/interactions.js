@@ -715,7 +715,7 @@ export function createInteractions({ board, world, view, layer, zoneLayer, ui })
     }
 
     if (inField || ui.blocking()) return;
-    if (zi.onKeyDown(e)) return; // Delete, Enter or F2 while a zone is selected
+    if (!interactiveTarget(e.target) && zi.onKeyDown(e)) return; // Delete, Enter or F2 while a zone is selected
 
     switch (e.key) {
       case 'Delete':
@@ -738,11 +738,11 @@ export function createInteractions({ board, world, view, layer, zoneLayer, ui })
         break;
       case 'z':
       case 'Z':
-        if (!e.shiftKey) { e.preventDefault(); zi.createAtPointer(); }
+        if (!e.shiftKey && !e.repeat) { e.preventDefault(); zi.createAtPointer(); } // holding the key makes one zone, not dozens
         break;
       case 'g':
       case 'G':
-        if (!e.shiftKey) { e.preventDefault(); zi.wrapSelected(); }
+        if (!e.shiftKey && !e.repeat) { e.preventDefault(); zi.wrapSelected(); }
         break;
       case 'Home':
         view.home();
