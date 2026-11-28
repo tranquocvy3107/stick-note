@@ -5,6 +5,9 @@ data/
 dist/
 .cache/
 
+# Rust build output
+/target/
+
 node_modules/
 *.log
 .DS_Store

@@ -1,0 +1,9 @@
+# The Rust compiler that every build uses, so the same source gives the same program on every machine and in CI.
+# Bump it on purpose: change the version here, run `npm test`, build the packages, and say so in CHANGELOG.md.
+# (With rustup, `rustup toolchain install` in this folder installs exactly what is listed here.)
+[toolchain]
+channel = "1.100.1"
+profile = "minimal"
+components = ["clippy", "rustfmt"]
+# The Linux packages are static programs for this target; Windows can build it too (see tools/package/rust.mjs).
+targets = ["x86_64-unknown-linux-musl"]
