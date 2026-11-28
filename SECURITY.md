@@ -32,4 +32,4 @@ Only the **latest release** receives security fixes. Please update before report
 
 ## Scope
 
-In scope: the server (`server.js`, `src/`), the interface (`public/`), the installers and the release workflows. Out of scope: vulnerabilities in the browser you use to display the app, in Node.js itself (report those upstream, we will update the bundled runtime), or attacks that need physical access to an unlocked computer.
+In scope: the program (`crates/stick-note`), the interface (`public/`), the installers and the release workflows. Out of scope: vulnerabilities in the browser you use to display the app, in the Rust compiler, its standard library or a crate we depend on (report those upstream; we update as soon as a fixed version exists, and Dependabot proposes new crate versions every week), or attacks that need physical access to an unlocked computer.

@@ -26,7 +26,7 @@ Stick Note is a private notes app with **one screen**: a big, endless whiteboard
 
 ## Install
 
-Download **one file** from the [latest release](https://github.com/vytk712025main-eng/stick-note/releases/latest) and double-click it. You do **not** need Node.js, a terminal or an account.
+Download **one file** from the [latest release](https://github.com/vytk712025main-eng/stick-note/releases/latest) and double-click it. You do **not** need a terminal, any other software or an account. The whole program is one small file (about 1.5 MB).
 
 | Your computer | Download | Then |
 |---|---|---|
@@ -109,13 +109,13 @@ Still stuck? [Open an issue](https://github.com/vytk712025main-eng/stick-note/is
 
 ## For developers
 
-Stick Note is a zero-dependency Node.js server (`server.js`, `src/`) plus a vanilla JavaScript interface (`public/`), with no build step.
+Stick Note is one small program written in [Rust](https://www.rust-lang.org/) (`crates/stick-note`: the local server, the launcher and the command line in a single file, with the interface inside) plus a vanilla JavaScript interface (`public/`) that has no dependencies and no build step.
 
 ```bash
 git clone https://github.com/vytk712025main-eng/stick-note.git
 cd stick-note
-npm test                # needs Node.js 20.11 or newer
-node server.js --open   # start it and open the app window (also: ./start.sh, start.bat)
+npm test                # builds the program, runs the Rust and JavaScript tests (needs Rust via rustup, and Node.js 20.11 or newer)
+npm start               # build it and open the app window (also: cargo run --release -- --open, ./start.sh, start.bat)
 ```
 
 - [CONTRIBUTING.md](CONTRIBUTING.md): ground rules, project layout, tests, translations.
