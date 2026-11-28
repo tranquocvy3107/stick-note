@@ -1,0 +1,13 @@
+# Stick Note is a Cargo workspace. The program itself is crates/stick-note; the web interface in public/ is
+# embedded into it, and the version number is read from package.json (the one place it is written).
+
+[workspace]
+resolver = "3"
+members = ["crates/stick-note"]
+
+[profile.release]
+# The program is I/O bound, so a small file matters more than raw speed.
+opt-level = "s"
+lto = "fat"
+codegen-units = 1
+strip = true

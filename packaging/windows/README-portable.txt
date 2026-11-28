@@ -1,7 +1,6 @@
 Stick Note {{version}} (portable)
 
-To start: double-click "Stick Note.exe". Nothing needs to be installed, and
-Node.js is already included.
+To start: double-click "Stick Note.exe". Nothing needs to be installed.
 
 Your notes are saved in the "data" folder that appears next to "Stick Note.exe".
   - To move Stick Note to another computer or a USB stick, copy this whole folder.

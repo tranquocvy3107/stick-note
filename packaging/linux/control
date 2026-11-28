@@ -6,8 +6,7 @@ Installed-Size: {{installedSize}}
 Section: utils
 Priority: optional
 Homepage: {{homepage}}
-# The bundled Node.js needs glibc 2.28 and the C++ runtime (checked against its symbol versions).
-Depends: libc6 (>= 2.28), libgcc-s1 (>= 4.2), libstdc++6 (>= 6)
+# The program is statically linked: everything it needs is inside the file, so it depends on no library at all.
 # Suggests, not Recommends: apt must never pull in a browser (on Ubuntu "chromium" is a snap).
 # Without any of these Stick Note opens in the default browser, which works too.
 Suggests: chromium | chromium-browser | google-chrome-stable | microsoft-edge-stable | brave-browser
@@ -20,4 +19,5 @@ Description: Personal whiteboard of sticky notes
  ~/.local/share/stick-note. The program runs in its own window when Chrome,
  Chromium, Edge or Brave is installed, and in your default browser otherwise.
  .
- A Node.js runtime is included, so nothing else needs to be installed.
+ The program is one small file with everything inside, so nothing else needs
+ to be installed.

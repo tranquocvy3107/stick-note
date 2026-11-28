@@ -5,8 +5,8 @@ set -e
 
 case "$1" in
   remove|upgrade|deconfigure)
-    if [ -x /opt/stick-note/runtime/node ] && [ -f /opt/stick-note/app/server.js ]; then
-      /opt/stick-note/runtime/node /opt/stick-note/app/server.js --stop || true
+    if [ -x /usr/lib/stick-note/stick-note ]; then
+      /usr/lib/stick-note/stick-note --stop || true
     fi
     ;;
 esac

@@ -1,4 +1,0 @@
-#!/bin/sh
-# Starts Stick Note from this folder. It works from anywhere, also through a symbolic link.
-here="$(dirname "$(readlink -f "$0")")"
-exec "$here/runtime/node" "$here/app/server.js" --open "$@"

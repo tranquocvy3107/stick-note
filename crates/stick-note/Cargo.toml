@@ -1,0 +1,55 @@
+[package]
+name = "stick-note"
+# The real version is the one in package.json: build.rs reads it and the program uses that (see paths.rs).
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.90"
+publish = false
+license = "MIT"
+description = "Stick Note: a personal whiteboard of sticky notes. Local server, launcher and command line in one program."
+
+[lib]
+name = "stick_note"
+path = "src/lib.rs"
+
+[[bin]]
+name = "stick-note"
+path = "src/main.rs"
+
+[dependencies]
+# HTTP server. hyper is used directly (no router) so that every route, status code and header can be kept
+# exactly as the Node.js server had them.
+tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "net", "time", "macros", "signal", "sync"] }
+hyper = { version = "1", default-features = false, features = ["http1", "server"] }
+hyper-util = { version = "0.1", default-features = false, features = ["tokio"] }
+http-body-util = "0.1"
+bytes = "1"
+
+# Data, files and text.
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+sha1 = "0.11"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+percent-encoding = "2"
+form_urlencoded = "1"
+
+# The web interface (public/) is compiled into the program (no MIME guessing and no include/exclude rules: they are not needed).
+rust-embed = { version = "8", default-features = false }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_Storage_FileSystem",
+  "Win32_System_Console",
+  "Win32_UI_WindowsAndMessaging",
+] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[build-dependencies]
+serde_json = "1"
+
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1"

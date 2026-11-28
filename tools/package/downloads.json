@@ -1,9 +1,8 @@
 {
-  "_comment": "Pinned third-party downloads used by the packaging scripts. To bump Node.js run: node tools/package/runtime.mjs update <version>. The Node.js SHA-256 values come from https://nodejs.org/dist/v<version>/SHASUMS256.txt and are checked on every build. For the AppImage tools, copy the digest GitHub shows for the release asset and check it after downloading.",
+  "_comment": "Pinned third-party downloads used by the packaging scripts. The Node.js entry is only used to run the scripts inside WSL (node tools/package/downloads.mjs update-node <version> pins another one; its SHA-256 comes from https://nodejs.org/dist/v<version>/SHASUMS256.txt and is checked on every use). For the AppImage tools, copy the digest GitHub shows for the release asset and check it after downloading.",
   "node": {
     "version": "24.22.3",
     "sha256": {
-      "win-x64.zip": "e612af99f626ab415ea225af6bce5c971feb448cb5cae250bb1c3fa50c5f7d9f",
       "linux-x64.tar.xz": "4f2b175a6d53a5c617a80dba2676238a0688cef28c6da4eba35c7d844e66fcfb"
     }
   },

@@ -11,8 +11,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { CACHE_DIR, fail, makeTempDir, note, removeDir, sha256File } from './lib.mjs';
-import { readConfig } from './runtime.mjs';
+import { fail, makeTempDir, removeDir } from './lib.mjs';
 
 const PORT_RANGE = [4760, 4790];
 const SMOKE_NOTE_ID = 'smoke-test-note';
@@ -72,20 +71,6 @@ export function appEnv(port, extra = {}) {
   return env;
 }
 
-/**
- * The runtime inside a package must be the verified official Node.js, untouched. The build verified
- * the download and unpacked it into .cache/, so comparing hashes proves nothing changed on the way.
- */
-export function checkRuntimeIsOfficial(file, target) {
-  const { version } = readConfig().node;
-  const official = path.join(CACHE_DIR, 'runtime', `node-v${version}-${target}`, target.startsWith('win') ? 'node.exe' : 'node');
-  if (!fs.existsSync(official)) {
-    note('the official runtime is not in .cache/, so the byte-for-byte comparison is skipped');
-    return;
-  }
-  check(sha256File(file) === sha256File(official), `the bundled runtime is byte-for-byte the official Node.js ${version}`);
-}
-
 // ---- processes -----------------------------------------------------------------
 
 /**
@@ -131,9 +116,9 @@ export async function runToEnd(command, args, { cwd, env, timeoutMs = 120_000 } 
  * Start a packaged app.
  *  mode "open": the command is a launcher that starts a background server and exits ("--open").
  *  mode "run":  the command keeps running in the foreground and prints the OPEN line (AppImage).
- * `expectOpenLine` is false for Stick Note.exe, which has no console and so prints nothing.
+ * With STICK_NOTE_NO_OPEN=1 the program prints the OPEN line (also Stick Note.exe: its output goes to a file here).
  */
-export async function startApp({ label, command, args = [], cwd, env, port, mode = 'open', expectOpenLine = true }) {
+export async function startApp({ label, command, args = [], cwd, env, port, mode = 'open' }) {
   console.log(`\n-- start: ${label}`);
   const proc = startProcess(command, args, { cwd, env });
   const app = { label, port, proc, mode, env };
@@ -143,10 +128,8 @@ export async function startApp({ label, command, args = [], cwd, env, port, mode
     const shown = [path.basename(command), ...args.map((a) => path.basename(a))].join(' ');
     check(done && !done.error && done.code === 0, `${shown} exits with code 0`,
       done ? `exit ${JSON.stringify(done)}\n${proc.output()}` : 'it did not exit within 60 s');
-    if (expectOpenLine) {
-      await sleep(150);
-      check(proc.output().includes(`OPEN http://127.0.0.1:${port}/`), `it reports OPEN http://127.0.0.1:${port}/ instead of opening a window`, proc.output());
-    }
+    await sleep(150);
+    check(proc.output().includes(`OPEN http://127.0.0.1:${port}/`), `it reports OPEN http://127.0.0.1:${port}/ instead of opening a window`, proc.output());
   } else {
     const line = await waitUntil(() => proc.output().includes(`OPEN http://127.0.0.1:${port}/`) || proc.exit, 60_000, 100);
     check(line && !proc.exit, 'the app runs in the foreground and reports the OPEN line', `${proc.output()}\n${JSON.stringify(proc.exit)}`);

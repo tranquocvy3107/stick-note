@@ -6,7 +6,7 @@ Stick Note keeps personal notes, so we take security reports seriously.
 
 Please **do not open a public issue** for a security problem. Use GitHub's private reporting instead:
 
-1. Open the [Security tab](https://github.com/tranquocvy3107/stick-note/security) of this repository.
+1. Open the [Security tab](https://github.com/vytk712025main-eng/stick-note/security) of this repository.
 2. Click **Report a vulnerability** and describe the problem: what you did, what happened, and which version and operating system.
 
 You will get a first answer within about a week. This is a volunteer project, so fixes take the time they take, but we will keep you informed and credit you in the release notes if you wish.
@@ -32,4 +32,4 @@ Only the **latest release** receives security fixes. Please update before report
 
 ## Scope
 
-In scope: the server (`server.js`, `src/`), the interface (`public/`), the installers and the release workflows. Out of scope: vulnerabilities in the browser you use to display the app, in Node.js itself (report those upstream, we will update the bundled runtime), or attacks that need physical access to an unlocked computer.
+In scope: the program (`crates/stick-note`), the interface (`public/`), the installers and the release workflows. Out of scope: vulnerabilities in the browser you use to display the app, in the Rust compiler, its standard library or a crate we depend on (report those upstream; we update as soon as a fixed version exists, and Dependabot proposes new crate versions every week), or attacks that need physical access to an unlocked computer.

@@ -1,7 +1,7 @@
 Stick Note {{version}} (Linux, no installation)
 
 To start: run "stick-note" in this folder (in a terminal: ./stick-note).
-Nothing needs to be installed, and Node.js is already included.
+Nothing needs to be installed.
 
 Stick Note opens in its own window when Chrome, Chromium, Edge or Brave is
 installed. Otherwise it opens in a tab of your default browser, which works too.

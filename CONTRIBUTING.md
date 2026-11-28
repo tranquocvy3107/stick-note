@@ -11,31 +11,31 @@ Stick Note has **one screen: a whiteboard**. You drop paper notes on it and find
 3. **Capturing is fast.** Drag a slip, double-click, press `N` or paste.
 4. **Reusing is fast.** Links open and copy at once; images view and copy at once.
 5. **Never lose data.** Autosave, safe writes, backups, a trash, undo. A change that could lose data needs discussion first.
-6. **Zero runtime dependencies.** The app runs with plain Node.js and plain browser JavaScript. Please open an issue before adding a dependency (build tools for packaging are discussed case by case).
+6. **Few dependencies.** The interface is plain browser JavaScript with no dependencies and no build step. The program is Rust and uses a small set of widely used crates (see `Cargo.toml`). Please open an issue before adding one (build tools for packaging are discussed case by case).
 
 If your idea bends one of these, open an issue first so we can talk it through before you spend time on it.
 
 ## Getting started
 
-You need [Node.js](https://nodejs.org) 20.11 or newer and a Chromium-based browser (Edge, Chrome, Chromium, Brave).
+You need [Rust](https://rustup.rs) (the exact compiler version is pinned in `rust-toolchain.toml`; run `rustup toolchain install` in the folder once), [Node.js](https://nodejs.org) 20.11 or newer (it runs the JavaScript tests and the packaging scripts), and a Chromium-based browser (Edge, Chrome, Chromium, Brave).
 
 ```bash
-git clone https://github.com/tranquocvy3107/stick-note.git
+git clone https://github.com/vytk712025main-eng/stick-note.git
 cd stick-note
-npm test                                  # all tests, no install step
-node server.js                            # run in the foreground and watch the log
-node server.js --open                     # run in the background and open the app window
+npm test                                  # builds the program, runs cargo test and the JavaScript tests
+cargo run -- --serve                      # run in the foreground and watch the log (reads public/ from disk: edit and reload)
+cargo run --release -- --open             # run in the background and open the app window (also: npm start)
 ```
 
-**Use a throw-away data folder and another port while developing** so you never touch real notes or a copy you use every day:
+**Use a throw-away data folder and another port while developing** so you never touch real notes or a copy you use every day. (A program built inside the checkout keeps its notes in `./data`, which is git-ignored.)
 
 ```bash
 # bash
-STICK_NOTE_DATA=/tmp/stick-dev PORT=4748 node server.js --open
+STICK_NOTE_DATA=/tmp/stick-dev PORT=4748 cargo run -- --serve
 ```
 ```powershell
 # PowerShell
-$env:STICK_NOTE_DATA = "$env:TEMP\stick-dev"; $env:PORT = '4748'; node server.js --open
+$env:STICK_NOTE_DATA = "$env:TEMP\stick-dev"; $env:PORT = '4748'; cargo run -- --serve
 ```
 
 `STICK_NOTE_NO_OPEN=1` prints the address instead of opening a window (handy for scripts and tests).
@@ -43,16 +43,16 @@ $env:STICK_NOTE_DATA = "$env:TEMP\stick-dev"; $env:PORT = '4748'; node server.js
 ## Project layout
 
 ```
-server.js            Entry point and command line (--open, --run, --stop, ...)
-src/                 Server: paths.js (where data lives), app.js (HTTP, API, storage, backups),
-                     launcher.js (app window, browser detection), http.js, util.js
-public/              The interface (plain ES modules, no build step)
+Cargo.toml           The Rust workspace (the compiler version is pinned in rust-toolchain.toml)
+crates/stick-note/   The program: cli.rs (command line), app.rs (HTTP, API), store.rs (board, backups, pictures),
+                     presence.rs, paths.rs, launcher.rs (app window, browser detection), winui.rs (Windows details)
+public/              The interface (plain ES modules, no build step); it is embedded into the program
   index.html         All the markup
   css/app.css        All the styling (light and dark)
   js/                main, store, view, noteview, interactions, capture, ui, i18n, ...
   locales/           en.json, vi.json: every visible text
-test/                node:test suites (npm test)
-tools/               Icon and release helpers; tools/package builds the installers
+test/                JavaScript suites; test/contract starts the real program and tests it over HTTP
+tools/               Icon, test and release helpers; tools/package builds the installers
 CLAUDE.md            Architecture notes and decisions in more detail
 ```
 
@@ -60,14 +60,15 @@ CLAUDE.md            Architecture notes and decisions in more detail
 
 1. Fork, then create a branch from `main`.
 2. Make the change. Keep it focused: one topic per pull request.
-3. Add or update tests. Pure logic goes in `test/logic.test.js`; server behaviour in `test/server.test.js`.
-4. Run `npm test`; everything must pass.
+3. Add or update tests. Pure interface logic goes in `test/logic.test.js`; what the program does over HTTP or on the command line in `test/contract/`; Rust logic in a `#[cfg(test)]` module next to it.
+4. Run `npm test`; everything must pass. CI also runs `cargo fmt --all --check` and `cargo clippy --all-targets -- -D warnings`.
 5. If you changed what a user sees, try it in a real browser window and describe what you checked (a screenshot helps).
 6. Open a pull request using the template.
 
 ### Style
 
 - Plain JavaScript (ES modules), 2-space indent, single quotes, semicolons.
+- Rust: `cargo fmt` decides the layout (`rustfmt.toml`), clippy must be quiet, and the only `unsafe` code lives in `winui.rs`.
 - Everything in the repository is written in **English**: code, comments, commit messages, documentation.
 - Comments explain *why*, not what. Name things plainly.
 - No emoji in code or user-facing text.
@@ -93,7 +94,7 @@ Anything missing falls back to English, so a partial translation still works.
 
 ## Reporting bugs and ideas
 
-Use the [issue templates](https://github.com/tranquocvy3107/stick-note/issues/new/choose). For security problems, follow [SECURITY.md](SECURITY.md) instead of opening a public issue.
+Use the [issue templates](https://github.com/vytk712025main-eng/stick-note/issues/new/choose). For security problems, follow [SECURITY.md](SECURITY.md) instead of opening a public issue.
 
 ## Releases (maintainers)
 

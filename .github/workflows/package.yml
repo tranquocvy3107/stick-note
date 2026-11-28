@@ -21,10 +21,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The installer test also upgrades over a copy of the old layout (versions up to 1.2.x ran on Node.js),
+          # which it takes from the git tag v1.2.0: that needs the tags.
+          fetch-depth: 0
 
+      # Node.js only runs the packaging scripts; the program itself is Rust.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
+
+      # The compiler version is pinned in rust-toolchain.toml; this installs exactly that one.
+      - name: Install the Rust toolchain
+        run: rustup toolchain install
 
       - name: Install Inno Setup (only when the runner image does not have it)
         shell: pwsh
@@ -40,8 +48,8 @@ jobs:
       - name: Build the installer and the portable zip
         run: node tools/package/build-windows.mjs
 
-      # Installs into temporary folders, upgrades over a running copy, uninstalls. The clean runner has no
-      # "Stick Note" shortcut of its own, so the Desktop shortcut can be tested too.
+      # Installs into temporary folders, upgrades over a running copy (new and old layout), uninstalls. The clean
+      # runner has no "Stick Note" shortcut of its own, so the Desktop shortcut can be tested too.
       - name: Smoke-test them
         run: node tools/package/smoke-windows.mjs --desktop-shortcut
 
@@ -68,9 +76,15 @@ jobs:
         with:
           persist-credentials: false
 
+      # Node.js only runs the packaging scripts; the program itself is Rust.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
+
+      # The compiler version is pinned in rust-toolchain.toml; this installs exactly that one, with the musl target
+      # that gives a static program (it runs on any distribution).
+      - name: Install the Rust toolchain
+        run: rustup toolchain install
 
       - name: Install lintian (checks the .deb) and desktop-file-utils (checks the menu entry)
         run: |

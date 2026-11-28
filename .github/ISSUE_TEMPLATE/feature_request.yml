@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         Stick Note is deliberately small: **one whiteboard, and your memory of where things are.**
-        Ideas that keep that spirit are very welcome. Please read the short list of principles in [CONTRIBUTING.md](https://github.com/tranquocvy3107/stick-note/blob/main/CONTRIBUTING.md) first.
+        Ideas that keep that spirit are very welcome. Please read the short list of principles in [CONTRIBUTING.md](https://github.com/vytk712025main-eng/stick-note/blob/main/CONTRIBUTING.md) first.
   - type: textarea
     id: problem
     attributes:

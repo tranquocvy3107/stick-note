@@ -17,8 +17,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { assetNames } from './names.mjs';
 import { DIST_DIR, VERSION, capture, fail, note, parseArgs, parseOnly, runMain, step, trackTempDirs, which } from './lib.mjs';
+import { elfIsStatic } from './rust.mjs';
 import {
-  appEnv, check, checkRuntimeIsOfficial, cleanupApp, findFreePort, makeTempDir, ping, removeDir, runToEnd, startApp,
+  appEnv, check, cleanupApp, findFreePort, makeTempDir, ping, removeDir, runToEnd, startApp,
   stopApp, verifyApp, watchServer,
 } from './smoke-lib.mjs';
 
@@ -72,12 +73,13 @@ function inspectDeb(deb) {
   check(entries.every((e) => e.owner === 'root/root'), 'every file belongs to root');
   check(entries.filter((e) => e.mode[0] === 'd').every((e) => e.mode === 'drwxr-xr-x'), 'every folder is mode 755');
   const executables = entries.filter((e) => e.mode[0] === '-' && e.mode.includes('x')).map((e) => e.file).sort();
-  check(JSON.stringify(executables) === JSON.stringify(['opt/stick-note/runtime/node', 'usr/bin/stick-note']),
-    'only the runtime and the /usr/bin launcher are executable', executables.join(', '));
+  check(JSON.stringify(executables) === JSON.stringify(['usr/lib/stick-note/stick-note']), 'only the program is executable', executables.join(', '));
   check(entries.filter((e) => e.mode[0] === '-' && !e.mode.includes('x')).every((e) => e.mode === '-rw-r--r--'), 'every other file is mode 644');
+  const link = byPath.get('usr/bin/stick-note');
+  check(link && link.mode[0] === 'l' && link.link === '../lib/stick-note/stick-note', '/usr/bin/stick-note is a link to the program in /usr/lib/stick-note', JSON.stringify(link));
+  check(!entries.some((e) => e.file.startsWith('opt/')), 'nothing is installed under /opt (the old Node.js layout is gone)');
   const need = [
-    'opt/stick-note/runtime/node', 'opt/stick-note/runtime/LICENSE-node.txt', 'opt/stick-note/app/server.js',
-    'opt/stick-note/app/build-info.json', 'opt/stick-note/app/public/index.html', 'opt/stick-note/THIRD-PARTY-NOTICES.txt',
+    'usr/lib/stick-note/stick-note', 'usr/lib/stick-note/build-info.json', 'usr/lib/stick-note/THIRD-PARTY-NOTICES.txt',
     'usr/bin/stick-note', 'usr/share/applications/stick-note.desktop', 'usr/share/doc/stick-note/copyright',
     'usr/share/doc/stick-note/changelog.gz', 'usr/share/man/man1/stick-note.1.gz', 'usr/share/icons/hicolor/scalable/apps/stick-note.svg',
     ...[16, 32, 48, 64, 256, 512].map((s) => `usr/share/icons/hicolor/${s}x${s}/apps/stick-note.png`),
@@ -120,7 +122,7 @@ async function smokeDeb(dist, { requireLintian }) {
   const dataDir = path.join(xdg, 'stick-note');
   const port = await findFreePort();
   const env = appEnv(port, { XDG_DATA_HOME: xdg });
-  const stopCommand = { command: '/opt/stick-note/runtime/node', args: ['/opt/stick-note/app/server.js', '--stop'] };
+  const stopCommand = { command: '/usr/bin/stick-note', args: ['--stop'] };
   const start = (label) => startApp({ label, command: '/usr/bin/stick-note', env, port });
 
   let app = null;
@@ -131,8 +133,8 @@ async function smokeDeb(dist, { requireLintian }) {
     const status = capture('dpkg', ['-s', 'stick-note']).stdout;
     check(/Status: install ok installed/.test(status), 'dpkg reports it as installed');
     const listed = capture('dpkg', ['-L', 'stick-note']).stdout.split('\n');
-    for (const p of ['/opt/stick-note/runtime/node', '/usr/bin/stick-note', '/usr/share/applications/stick-note.desktop']) check(listed.includes(p), `dpkg -L lists ${p}`);
-    checkRuntimeIsOfficial('/opt/stick-note/runtime/node', 'linux-x64');
+    for (const p of ['/usr/lib/stick-note/stick-note', '/usr/bin/stick-note', '/usr/share/applications/stick-note.desktop']) check(listed.includes(p), `dpkg -L lists ${p}`);
+    check(elfIsStatic('/usr/lib/stick-note/stick-note'), 'the installed program is statically linked (it needs nothing from this distribution)');
     const version = capture('/usr/bin/stick-note', ['--version'], { env: appEnv(port) });
     check(version.stdout.trim() === VERSION, `"stick-note --version" prints ${VERSION}`, version.stdout + version.stderr);
     const validate = which('desktop-file-validate');
@@ -166,8 +168,8 @@ async function smokeDeb(dist, { requireLintian }) {
     await cleanupApp(app);
     app = null;
     check(!installed(), 'dpkg no longer lists the package');
-    check(!fs.existsSync('/opt/stick-note') && !fs.existsSync('/usr/bin/stick-note') && !fs.existsSync('/usr/share/applications/stick-note.desktop'),
-      '/opt/stick-note, /usr/bin/stick-note and the menu entry are gone');
+    check(!fs.existsSync('/usr/lib/stick-note') && !fs.existsSync('/usr/bin/stick-note') && !fs.existsSync('/usr/share/applications/stick-note.desktop'),
+      '/usr/lib/stick-note, /usr/bin/stick-note and the menu entry are gone');
     check(fs.existsSync(path.join(dataDir, 'board.json')), `the notes survive the removal (${path.join(dataDir, 'board.json')})`);
   } finally {
     await cleanupApp(app);
@@ -201,14 +203,14 @@ async function smokeAppImage(dist, { fuse }) {
     check(extract.code === 0, '--appimage-extract unpacks it', extract.output);
     const root = path.join(unpacked, 'squashfs-root');
     const inside = path.join(root, 'usr', 'lib', 'stick-note');
-    for (const rel of ['AppRun', 'stick-note.desktop', 'stick-note.png', '.DirIcon', 'usr/lib/stick-note/runtime/node', 'usr/lib/stick-note/app/server.js']) {
+    for (const rel of ['AppRun', 'stick-note.desktop', 'stick-note.png', '.DirIcon', 'usr/lib/stick-note/stick-note', 'usr/lib/stick-note/build-info.json']) {
       check(fs.existsSync(path.join(root, ...rel.split('/'))), `it contains ${rel}`);
     }
     check(fs.statSync(path.join(root, 'AppRun')).mode & 0o111, 'AppRun is executable');
     const appRun = fs.readFileSync(path.join(root, 'AppRun'), 'utf8');
-    check(/server\.js" --run "\$@"/.test(appRun), 'AppRun starts the server in the foreground (--run)');
-    checkRuntimeIsOfficial(path.join(inside, 'runtime', 'node'), 'linux-x64');
-    const build = JSON.parse(fs.readFileSync(path.join(inside, 'app', 'build-info.json'), 'utf8'));
+    check(/stick-note\/stick-note" --run "\$@"/.test(appRun), 'AppRun starts the program in the foreground (--run)');
+    check(elfIsStatic(path.join(inside, 'stick-note')), 'the program inside is statically linked');
+    const build = JSON.parse(fs.readFileSync(path.join(inside, 'build-info.json'), 'utf8'));
     check(build.channel === 'linux-appimage' && build.dataDir === 'user' && build.version === VERSION, 'build-info.json says linux-appimage, dataDir user', JSON.stringify(build));
 
     const run = async (label, extraEnv) => {
@@ -254,19 +256,20 @@ async function smokeTarball(dist) {
     const top = `stick-note-${VERSION}-linux-x64`;
     check(JSON.stringify(fs.readdirSync(extracted)) === JSON.stringify([top]), `it has the single top-level folder ${top}/`, fs.readdirSync(extracted).join(', '));
     const root = path.join(extracted, top);
-    for (const rel of ['stick-note', 'README.txt', 'THIRD-PARTY-NOTICES.txt', 'runtime/node', 'runtime/LICENSE-node.txt', 'app/server.js', 'app/build-info.json', 'app/package.json', 'app/LICENSE']) {
+    for (const rel of ['stick-note', 'build-info.json', 'README.txt', 'LICENSE', 'THIRD-PARTY-NOTICES.txt']) {
       check(fs.existsSync(path.join(root, ...rel.split('/'))), `it contains ${rel}`);
     }
-    check((fs.statSync(path.join(root, 'stick-note')).mode & 0o111) !== 0 && (fs.statSync(path.join(root, 'runtime', 'node')).mode & 0o111) !== 0, 'stick-note and runtime/node are executable');
-    checkRuntimeIsOfficial(path.join(root, 'runtime', 'node'), 'linux-x64');
-    const build = JSON.parse(fs.readFileSync(path.join(root, 'app', 'build-info.json'), 'utf8'));
-    check(build.channel === 'linux-tarball' && build.dataDir === '../data' && build.version === VERSION, 'build-info.json says linux-tarball, dataDir ../data', JSON.stringify(build));
+    check(!fs.existsSync(path.join(root, 'runtime')) && !fs.existsSync(path.join(root, 'app')), 'there is no runtime/ or app/ folder (nothing of the old Node.js layout is left)');
+    check((fs.statSync(path.join(root, 'stick-note')).mode & 0o111) !== 0, 'stick-note is executable');
+    check(elfIsStatic(path.join(root, 'stick-note')), 'stick-note is statically linked');
+    const build = JSON.parse(fs.readFileSync(path.join(root, 'build-info.json'), 'utf8'));
+    check(build.channel === 'linux-tarball' && build.dataDir === 'data' && build.version === VERSION, 'build-info.json says linux-tarball, dataDir data', JSON.stringify(build));
 
     // Notes must end up next to the program, so the folder can be moved or copied as a whole.
     const dataDir = path.join(root, 'data');
     const port = await findFreePort();
     const env = appEnv(port, { XDG_DATA_HOME: path.join(work, 'must-stay-unused') });
-    const stopCommand = { command: path.join(root, 'runtime', 'node'), args: [path.join(root, 'app', 'server.js'), '--stop'] };
+    const stopCommand = { command: path.join(root, 'stick-note'), args: ['--stop'] };
     const link = path.join(work, 'link-to-stick-note');
     fs.symlinkSync(path.join(root, 'stick-note'), link);
 

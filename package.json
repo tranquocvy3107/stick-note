@@ -1,16 +1,16 @@
 {
   "name": "stick-note",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
   "license": "MIT",
   "author": "tranquocvy3107",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tranquocvy3107/stick-note.git"
+    "url": "git+https://github.com/vytk712025main-eng/stick-note.git"
   },
-  "homepage": "https://github.com/tranquocvy3107/stick-note#readme",
+  "homepage": "https://github.com/vytk712025main-eng/stick-note#readme",
   "bugs": {
-    "url": "https://github.com/tranquocvy3107/stick-note/issues"
+    "url": "https://github.com/vytk712025main-eng/stick-note/issues"
   },
   "keywords": ["whiteboard", "sticky-notes", "notes", "local-first", "offline", "windows", "linux"],
   "description": "A personal whiteboard of sticky notes: drag a slip onto the board, write text, a link or an image, and leave it where it is.",
@@ -19,9 +19,10 @@
     "node": ">=20.11"
   },
   "scripts": {
-    "start": "node server.js --open",
-    "serve": "node server.js",
-    "test": "node --test",
+    "start": "cargo run --release --locked -- --open",
+    "serve": "cargo run --locked -- --serve",
+    "test": "node tools/run-tests.mjs",
+    "test:js": "node --test test/logic.test.js test/i18n.test.js test/store.test.js test/zones.test.js test/release-notes.test.js tools/package/package.test.mjs",
     "package:windows": "node tools/package/build-windows.mjs",
     "package:linux": "node tools/package/build-linux.mjs",
     "package:linux:wsl": "node tools/package/wsl.mjs all",
