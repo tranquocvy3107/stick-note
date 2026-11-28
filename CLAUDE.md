@@ -97,7 +97,7 @@ public/
     image.js           Read images, make thumbnails, upload
     ui.js              Zoom bar, search, menu, trash drawer, image viewer, help, notices
     util.js, constants.js, icons.js
-test/                  logic, store, zones, i18n and release-notes suites; contract/ starts the real program and tests it over HTTP; fixtures/ holds a data folder written by 1.2.1
+test/                  logic, store, zones, i18n and release-notes suites; contract/ starts the real program and tests it over HTTP; fixtures/ holds a data folder written by the last Node.js server (1.2.1)
 tools/                 icons, release notes, run-tests, create-shortcut; package/ builds installers and release assets
 packaging/             Inno Setup script and portable readme (Windows), Linux desktop, man page and Debian package files
 .github/               CI and release workflows, issue and PR templates, Dependabot
@@ -165,7 +165,7 @@ Verifying attestations: releases up to 1.2.0 verify only with `gh attestation ve
 - A program that starts another one passes on every inheritable handle, pipes included, so a test that waits for the pipe to close waits for the background server. `winui::protect_std_handles` marks our standard handles as not inheritable before the server is started. PowerShell's `Start-Process -Wait` also waits for all children and would hang until the server quits by itself.
 - Closing a socket that still has unread data makes Windows send a reset, and the client loses the answer. Servers read the whole request first (also in tests); the program drains an oversized upload before it answers 413.
 - **Tools that write files may decode escapes** such as `\uXXXX` (they turn into the characters) and some shells collapse `\\`. Build such strings at run time in code (see `esc()` in `store.rs`) and search the result for `\\u[0-9a-f]{4}`.
-- The Rust program writes numbers and text with `serde_json` and keeps the key order (`preserve_order`), so `board.json` stays in the layout of the Node.js versions; `test/fixtures/node-1.2.1` is a data folder written by 1.2.1 that the contract tests must keep opening. Never regenerate it.
+- The Rust program writes numbers and text with `serde_json` and keeps the key order (`preserve_order`), so `board.json` stays in the layout of the Node.js versions; `test/fixtures/node-1.2.1` is a data folder written by the last Node.js server (version 1.2.1, never released on its own: its changes shipped in 1.3.0) that the contract tests must keep opening. Never regenerate it.
 - Windows PowerShell 5.1 started from PowerShell 7 inherits `PSModulePath` and then `Expand-Archive` extracts nothing while exiting 0. The packaging scripts drop `PSModulePath` for child PowerShell processes (`childEnv`).
 
 ## Testing in the Claude environment

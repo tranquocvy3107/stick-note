@@ -5,7 +5,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [1.3.0] - 2026-11-28
 
-Stick Note is now a native program: one small file, with no Node.js inside.
+Stick Note is now a native program: one small file, with no Node.js inside. This release also fixes a window losing its connection to the server and records the project's new address.
 
 ### Changed
 
@@ -14,25 +14,18 @@ Stick Note is now a native program: one small file, with no Node.js inside.
 - The Linux packages hold a single static program that runs on every distribution; the `.deb` no longer depends on any library.
 - When Stick Note cannot start (for example because another program uses port 4747) it now says so in a message box, with the reason, instead of failing silently.
 - Building from source needs Rust (via `rustup`; the exact compiler version is in `rust-toolchain.toml`) and Node.js 20.11 or newer for the tests. See CONTRIBUTING.md.
-
-### Added
-
-- `THIRD-PARTY-NOTICES.txt` in every package lists the open source libraries inside the program with their licenses.
-- Contract tests that start the real program and check the whole HTTP interface, the data files, the backups and the command line, including a data folder written by version 1.2.1.
-
-## [1.2.1] - 2026-11-28
-
-Fixes a window losing its connection to the server, and records the project's new address.
+- The project moved to https://github.com/vytk712025main-eng/stick-note. The old address redirects there. Links, issue templates and release notes now use the new address.
+- **Checking a download** (optional): releases up to 1.2.0 were built before the move and can be verified with `gh attestation verify <file> --owner tranquocvy3107`. This and later releases use `gh attestation verify <file> --repo vytk712025main-eng/stick-note`. The checksums in `SHA256SUMS.txt` work for every release.
+- `/api/info` also reports how many windows are open.
 
 ### Fixed
 
 - **"Lost connection to the server" after leaving the window alone.** The background server used to quit when the window had not reported in for 5 minutes. A browser can freeze or slow down a window that is minimised or hidden, so the server took a window that was only resting for a closed one and shut down, and the window showed the red "Lost connection" bar when you came back. Each window now says goodbye when it really closes, and the server only quits after that: a window that is merely quiet is never counted as closed. If the server ever does stop, the window still keeps your notes and saves them as soon as you open Stick Note again from its shortcut.
 
-### Changed
+### Added
 
-- The project moved to https://github.com/vytk712025main-eng/stick-note. The old address redirects there. Links, issue templates and release notes now use the new address.
-- **Checking a download** (optional): releases up to 1.2.0 were built before the move and can be verified with `gh attestation verify <file> --owner tranquocvy3107`. This and later releases use `gh attestation verify <file> --repo vytk712025main-eng/stick-note`. The checksums in `SHA256SUMS.txt` work for every release.
-- `/api/info` also reports how many windows are open.
+- `THIRD-PARTY-NOTICES.txt` in every package lists the open source libraries inside the program with their licenses.
+- Contract tests that start the real program and check the whole HTTP interface, the data files, the backups and the command line, including a data folder written by the last Node.js server.
 
 ## [1.2.0] - 2026-11-27
 
@@ -91,7 +84,6 @@ The first release.
 - Opens as its own app window with `start.bat`, a script that creates a desktop shortcut, and a background server that quits by itself when the window is closed.
 
 [1.3.0]: https://github.com/vytk712025main-eng/stick-note/releases/tag/v1.3.0
-[1.2.1]: https://github.com/vytk712025main-eng/stick-note/releases/tag/v1.2.1
 [1.2.0]: https://github.com/vytk712025main-eng/stick-note/releases/tag/v1.2.0
 [1.1.0]: https://github.com/vytk712025main-eng/stick-note/releases/tag/v1.1.0
 [1.0.0]: https://github.com/vytk712025main-eng/stick-note/releases/tag/v1.0.0
