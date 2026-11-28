@@ -3,13 +3,13 @@
 All notable changes to this project are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the version numbers follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.3.0] - 2026-11-28
 
 Stick Note is now a native program: one small file, with no Node.js inside.
 
 ### Changed
 
-- **The program is rewritten in Rust.** The local server, the launcher and the command line are now one program of about 1.5 MB, instead of a 80 MB Node.js runtime plus scripts. The Windows installer shrinks from about 24 MB to 2.5 MB, the portable zip and the Linux packages to under 2 MB. Nothing changes in how Stick Note looks or works: the same interface, the same app window, the same notes, the same files. The notes folder is read and written in exactly the layout of earlier versions, so going back to an earlier version works too.
+- **The program is rewritten in Rust.** The local server, the launcher and the command line are now one program of about 1.5 MB, instead of an 80 MB Node.js runtime plus scripts. The Windows installer shrinks from about 24 MB to 2.5 MB, the portable zip and the Linux packages to under 2 MB. Nothing changes in how Stick Note looks or works: the same interface, the same app window, the same notes, the same files. The notes folder is read and written in exactly the layout of earlier versions, so going back to an earlier version works too.
 - **Updating from 1.2.x** replaces the old Node.js files (the `runtime` and `app` folders) with the new program and keeps your notes. A running copy is stopped by the installer.
 - The Linux packages hold a single static program that runs on every distribution; the `.deb` no longer depends on any library.
 - When Stick Note cannot start (for example because another program uses port 4747) it now says so in a message box, with the reason, instead of failing silently.
@@ -90,6 +90,7 @@ The first release.
 - Automatic saving into the `data/` folder (JSON file and images), a backup every day, automatic recovery from a damaged file, merging when several windows are open, and unsaved notes kept in the window if the server stops unexpectedly.
 - Opens as its own app window with `start.bat`, a script that creates a desktop shortcut, and a background server that quits by itself when the window is closed.
 
+[1.3.0]: https://github.com/vytk712025main-eng/stick-note/releases/tag/v1.3.0
 [1.2.1]: https://github.com/vytk712025main-eng/stick-note/releases/tag/v1.2.1
 [1.2.0]: https://github.com/vytk712025main-eng/stick-note/releases/tag/v1.2.0
 [1.1.0]: https://github.com/vytk712025main-eng/stick-note/releases/tag/v1.1.0
