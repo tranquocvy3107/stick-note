@@ -3,7 +3,7 @@
 All notable changes to this project are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the version numbers follow [Semantic Versioning](https://semver.org/).
 
-## [1.2.1] - 2026-11-27
+## [1.2.1] - 2026-11-28
 
 Fixes a window losing its connection to the server, and records the project's new address.
 
