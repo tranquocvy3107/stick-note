@@ -205,8 +205,8 @@ export function gitCommit() {
 }
 
 /**
- * Contents of build-info.json (read by src/paths.js and /api/info).
- * dataDir "user" = per-user folder that survives upgrades; "../data" = next to the app (portable).
+ * Contents of build-info.json, which sits next to the program (read by crates/stick-note/src/paths.rs; /api/info reports it).
+ * dataDir "user" = per-user folder that survives upgrades; "data" = a folder next to the program (portable and tar.gz).
  */
 export function makeBuildInfo(channel, dataDir) {
   return { channel, dataDir, version: VERSION, commit: gitCommit(), builtAt: new Date(buildEpoch() * 1000).toISOString() };
@@ -344,70 +344,6 @@ export function touchTree(root, epoch = buildEpoch()) {
   walk(root);
   paths.push(root);
   for (const p of paths) fs.utimesSync(p, epoch, epoch);
-}
-
-// ---- the application payload --------------------------------------------------
-
-// An allow-list on purpose: what ships must never depend on what happens to sit in the checkout
-// (the notes in ./data, editor leftovers, a stray node_modules ...).
-const PAYLOAD = ['server.js', 'src', 'public', 'package.json', 'LICENSE'];
-const REQUIRED = ['server.js', 'package.json', 'LICENSE', 'src/app.js', 'src/paths.js', 'public/index.html'];
-const SKIP_NAMES = new Set(['.DS_Store', 'Thumbs.db', 'desktop.ini', 'node_modules', '.git', 'data']);
-const SKIP_PATTERN = /(~|\.(tmp|bak|orig|rej|swp|log))$/i;
-const TEXT_PATTERN = /\.(js|mjs|json|html|css|svg|txt|md)$/i;
-
-function copyEntry(src, dest) {
-  const stat = fs.lstatSync(src);
-  if (stat.isSymbolicLink()) fail(`${src} is a symbolic link; the payload must contain real files only`);
-  if (stat.isDirectory()) {
-    fs.mkdirSync(dest, { recursive: true });
-    for (const name of fs.readdirSync(src).sort()) {
-      if (SKIP_NAMES.has(name) || SKIP_PATTERN.test(name)) continue;
-      copyEntry(path.join(src, name), path.join(dest, name));
-    }
-    return;
-  }
-  // Text files are normalised to LF: a Windows checkout may have turned them into CRLF, and the
-  // same release should contain the same bytes whichever machine built it.
-  if (TEXT_PATTERN.test(src)) fs.writeFileSync(dest, toLf(fs.readFileSync(src, 'utf8')));
-  else fs.copyFileSync(src, dest);
-}
-
-/** Copy the application files into `appDir` and write build-info.json next to server.js. */
-export function stagePayload(appDir, buildInfo) {
-  fs.mkdirSync(appDir, { recursive: true });
-  for (const entry of PAYLOAD) {
-    const src = path.join(ROOT, entry);
-    if (!fs.existsSync(src)) fail(`${entry} is missing from the repository, nothing to package`);
-    copyEntry(src, path.join(appDir, entry));
-  }
-  for (const rel of REQUIRED) if (!fs.existsSync(path.join(appDir, rel))) fail(`The staged app has no ${rel}`);
-  writeText(path.join(appDir, 'build-info.json'), `${JSON.stringify(buildInfo, null, 2)}\n`);
-}
-
-/** Text of THIRD-PARTY-NOTICES.txt. The Windows installer additionally credits Inno Setup. */
-export function thirdPartyNotices({ nodeVersion, installer = false }) {
-  const parts = [
-    `${APP_NAME} includes the following third-party software.`,
-    '',
-    'Node.js',
-    `  Version: ${nodeVersion}`,
-    '  Used to run the app. It is the unmodified official build from https://nodejs.org/',
-    '  (the file runtime/node, or runtime\\stick-note-server.exe on Windows, which is node.exe renamed).',
-    '  License: MIT-style, plus the licenses of the components bundled in Node.js.',
-    '  Full text: runtime/LICENSE-node.txt, or https://github.com/nodejs/node/blob/main/LICENSE',
-  ];
-  if (installer) {
-    parts.push(
-      '',
-      'Inno Setup',
-      '  Used to build the Windows installer.',
-      '  Copyright (C) 1997-2026 Jordan Russell. Portions Copyright (C) 2000-2026 Martijn Laan.',
-      '  https://jrsoftware.org/isinfo.php',
-    );
-  }
-  parts.push('', `${APP_NAME} itself is MIT licensed; see app/LICENSE.`, '');
-  return parts.join('\n');
 }
 
 /**

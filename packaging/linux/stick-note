@@ -1,4 +1,0 @@
-#!/bin/sh
-# Starts Stick Note. "--open" starts the background server if none is running, opens the app
-# window and returns; the server quits by itself a few minutes after the last window is closed.
-exec /opt/stick-note/runtime/node /opt/stick-note/app/server.js --open "$@"

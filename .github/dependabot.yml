@@ -11,3 +11,15 @@ updates:
     groups:
       github-actions:
         patterns: ['*']
+
+  # The Rust crates in Cargo.lock. Dependabot opens one pull request a week for the newer compatible versions;
+  # the tests and the packaging smoke tests then run on it like on any change.
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: deps
+    groups:
+      rust-crates:
+        patterns: ['*']

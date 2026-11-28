@@ -8,10 +8,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { assetNames } from './names.mjs';
 import {
-  PackagingError, ROOT, childEnv, listFiles, makeBuildInfo, numericVersion, parseArgs, parseOnly, renderTemplate, stagePayload, toCrlf,
+  PackagingError, ROOT, childEnv, makeBuildInfo, numericVersion, parseArgs, parseOnly, renderTemplate, toCrlf,
 } from './lib.mjs';
 import { crc32, readEntry, readZip, writeZip } from './zip.mjs';
-import { parseChecksums, readConfig } from './runtime.mjs';
+import { parseChecksums, readConfig } from './downloads.mjs';
+import { TRIPLES, elfIsStatic, thirdPartyNotices } from './rust.mjs';
 
 const tempDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'stick-note-pkgtest-'));
 
@@ -66,10 +67,10 @@ test('SHASUMS256.txt lines are parsed', () => {
   assert.equal(sums.size, 2);
 });
 
-test('the pinned downloads in runtime.json are well formed', () => {
+test('the pinned downloads in downloads.json are well formed', () => {
   const config = readConfig();
   assert.match(config.node.version, /^\d+\.\d+\.\d+$/);
-  assert.deepEqual(Object.keys(config.node.sha256).sort(), ['linux-x64.tar.xz', 'win-x64.zip']);
+  assert.deepEqual(Object.keys(config.node.sha256), ['linux-x64.tar.xz'], 'Node.js is only used to run the scripts inside WSL: no Windows build, nothing is bundled');
   for (const hash of [...Object.values(config.node.sha256), config.appimagetool.sha256, config.appimageRuntime.sha256]) {
     assert.match(hash, /^[0-9a-f]{64}$/);
   }
@@ -117,24 +118,74 @@ test('templates fill their placeholders and refuse unknown ones', () => {
   assert.equal(toCrlf('a\nb\r\nc'), 'a\r\nb\r\nc');
 });
 
-test('the payload is an allow-list copy with LF line endings and a build-info.json', () => {
+test('build-info.json has the keys the program and the smoke tests read', () => {
+  const info = makeBuildInfo('linux-deb', 'user');
+  assert.deepEqual(Object.keys(info), ['channel', 'dataDir', 'version', 'commit', 'builtAt']);
+  assert.equal(info.channel, 'linux-deb');
+  assert.equal(info.dataDir, 'user');
+  assert.equal(new Date(info.builtAt).toISOString(), info.builtAt);
+});
+
+/** A 64-bit ELF file header followed by a program header table with the given segment types. */
+function fakeElf(types) {
+  const header = Buffer.alloc(64);
+  header.write('\x7fELF', 0, 'latin1');
+  header[4] = 2; // 64-bit
+  header.writeBigUInt64LE(64n, 32); // the program headers follow the file header
+  header.writeUInt16LE(56, 54); // size of one program header
+  header.writeUInt16LE(types.length, 56);
+  const table = Buffer.alloc(56 * types.length);
+  types.forEach((type, i) => table.writeUInt32LE(type, i * 56));
+  return Buffer.concat([header, table]);
+}
+
+test('a Linux program is recognised as static when it names no program interpreter', () => {
   const dir = tempDir();
   try {
-    const info = makeBuildInfo('linux-deb', 'user');
-    assert.deepEqual(Object.keys(info), ['channel', 'dataDir', 'version', 'commit', 'builtAt']);
-    assert.equal(new Date(info.builtAt).toISOString(), info.builtAt);
-
-    const app = path.join(dir, 'app');
-    stagePayload(app, info);
-    const files = listFiles(app);
-    for (const required of ['server.js', 'package.json', 'LICENSE', 'build-info.json', 'src/app.js', 'public/index.html']) assert.ok(files.includes(required), required);
-    assert.deepEqual(files.filter((f) => !/^(server\.js|package\.json|LICENSE|build-info\.json|src\/|public\/)/.test(f)), [], 'only the allow-listed entries');
-    assert.ok(!files.some((f) => f.startsWith('data/') || f.includes('node_modules')), 'no notes and no node_modules');
-    assert.ok(!fs.readFileSync(path.join(app, 'server.js'), 'utf8').includes('\r'), 'server.js has LF line endings');
-    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(app, 'build-info.json'), 'utf8')), info);
+    const PT_LOAD = 1;
+    const PT_DYNAMIC = 2;
+    const PT_INTERP = 3;
+    const write = (name, bytes) => { fs.writeFileSync(path.join(dir, name), bytes); return path.join(dir, name); };
+    assert.equal(elfIsStatic(write('static', fakeElf([PT_LOAD, PT_LOAD]))), true);
+    assert.equal(elfIsStatic(write('static-pie', fakeElf([PT_LOAD, PT_DYNAMIC]))), true, 'a static-pie program has a dynamic section but no interpreter');
+    assert.equal(elfIsStatic(write('dynamic', fakeElf([PT_INTERP, PT_LOAD, PT_DYNAMIC]))), false);
+    assert.throws(() => elfIsStatic(write('text', Buffer.from('#!/bin/sh\necho hi\n'.repeat(10)))), PackagingError);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('the third-party notices name the crates compiled for each system and print each license text once', () => {
+  const windows = thirdPartyNotices({ triple: TRIPLES.windows, installer: true });
+  const linux = thirdPartyNotices({ triple: TRIPLES.linux });
+  for (const text of [windows, linux]) {
+    assert.match(text, /^Stick Note includes the following third-party software\./);
+    for (const crate of ['tokio ', 'hyper ', 'serde_json ', 'rust-embed ']) assert.ok(text.includes(crate), crate);
+    assert.match(text, /Permission is hereby granted, free of charge/, 'the MIT license is printed');
+    assert.match(text, /Apache License/, 'the Apache license is printed');
+    // Each block is "Used by: <crates>" and then one license text. Identical texts must have been merged into one block.
+    const bodies = text.split('='.repeat(78)).filter((block) => block.trimStart().startsWith('Used by:')).map((block) => block.slice(block.indexOf('\n\n') + 2).trim());
+    assert.ok(bodies.length > 5, 'there are several different license texts');
+    assert.equal(new Set(bodies).size, bodies.length, 'a license text shared by several crates is printed once, not once per crate');
+    assert.match(text, /Stick Note itself is MIT licensed/);
+  }
+  assert.ok(windows.includes('windows-sys '), 'Windows builds include the Windows API crate');
+  assert.ok(!linux.includes('windows-sys '), 'Linux builds do not');
+  assert.ok(linux.includes('signal-hook-registry '), 'Linux builds include the Unix signal crate');
+  assert.ok(!windows.includes('signal-hook-registry '));
+  assert.match(windows, /Inno Setup/, 'the installer credits Inno Setup');
+  assert.doesNotMatch(linux, /Inno Setup/);
+  assert.doesNotMatch(windows + linux, /winresource|tempfile/, 'build-time and test-only crates are not shipped, so they are not listed');
+  assert.doesNotMatch(windows + linux, /serde_derive|tokio-macros|rust-embed-impl|\bsyn \d|\bquote \d/, 'procedural macros run at build time and are not part of the program');
+});
+
+test('the version number is written in package.json only and the program reads it from there', () => {
+  const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+  assert.match(pkg.version, /^\d+\.\d+\.\d+/);
+  const build = fs.readFileSync(path.join(ROOT, 'crates', 'stick-note', 'build.rs'), 'utf8');
+  assert.match(build, /package\.json/, 'build.rs reads the version from package.json');
+  const manifest = fs.readFileSync(path.join(ROOT, 'crates', 'stick-note', 'Cargo.toml'), 'utf8');
+  assert.match(manifest, /^version = "0\.0\.0"$/m, 'Cargo.toml carries no real version number, so there is nothing to keep in step');
 });
 
 test('the installer script keeps its identity and installs without administrator rights', () => {

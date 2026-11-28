@@ -6,12 +6,15 @@ Files: *
 Copyright: {{copyright}}
 License: MIT
 
-Files: opt/stick-note/runtime/*
-Copyright: Node.js contributors, and the authors of the components bundled in Node.js
-License: Node.js
- Node.js is released under the MIT license together with the licenses of the
- third-party components it contains. The complete text is in
- /opt/stick-note/runtime/LICENSE-node.txt.
+Files: usr/lib/stick-note/stick-note
+Copyright: {{copyright}}, the Rust Project Developers, and the authors of the Rust crates compiled into the program
+License: MIT and Third-party-Rust-crates
+
+License: Third-party-Rust-crates
+ The program is statically linked with the Rust standard library and with open
+ source Rust crates, which are released under licenses such as MIT, Apache-2.0
+ and Unicode-3.0. The crates, their licenses and the complete license texts are
+ listed in /usr/lib/stick-note/THIRD-PARTY-NOTICES.txt.
 
 License: MIT
 {{mitText}}

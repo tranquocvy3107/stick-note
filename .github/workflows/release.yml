@@ -31,6 +31,9 @@ jobs:
         with:
           node-version: 24
 
+      - name: Install the Rust toolchain (the version pinned in rust-toolchain.toml)
+        run: rustup toolchain install
+
       - name: The tag must match the version in package.json
         id: version
         run: |

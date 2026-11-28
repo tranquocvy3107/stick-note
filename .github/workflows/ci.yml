@@ -10,21 +10,35 @@ permissions:
 
 jobs:
   test:
-    name: Tests (${{ matrix.os }}, Node ${{ matrix.node }})
+    name: Tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [windows-latest, ubuntu-latest]
-        node: [22, 24, 26]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      # Node.js only runs the JavaScript tests and the packaging scripts; the program itself is Rust.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: ${{ matrix.node }}
+          node-version: 24
+
+      # The compiler version is pinned in rust-toolchain.toml; this installs exactly that one (the runners have rustup).
+      - name: Install the Rust toolchain
+        run: rustup toolchain install
+      - run: cargo --version
       - run: node --version
+
+      - name: Formatting (cargo fmt)
+        run: cargo fmt --all --check
+      - name: Lints (cargo clippy)
+        run: cargo clippy --all-targets --locked -- -D warnings
+
+      # Builds the program, runs the Rust unit tests, then the JavaScript tests including the contract tests that
+      # start the program and talk to it over HTTP.
       - run: npm test
 
   # Proves on every change that the installers can still be built and that the result starts and saves a note.

@@ -5,4 +5,4 @@
 # and AppRun would exit at once; the AppImage then unmounts itself and the background server would
 # lose the files it is running from.
 APPDIR="${APPDIR:-$(dirname "$(readlink -f "$0")")}"
-exec "$APPDIR/usr/lib/stick-note/runtime/node" "$APPDIR/usr/lib/stick-note/app/server.js" --run "$@"
+exec "$APPDIR/usr/lib/stick-note/stick-note" --run "$@"

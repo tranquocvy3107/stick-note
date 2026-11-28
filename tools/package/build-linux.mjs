@@ -1,14 +1,17 @@
 // Build the Linux packages (run this on Linux; from Windows use: npm run package:linux:wsl):
 //
-//   node tools/package/build-linux.mjs [--only deb,appimage,tarball] [--out dist] [--keep]
+//   node tools/package/build-linux.mjs [--only deb,appimage,tarball] [--out dist] [--keep] [--exe <program>]
 //
 // Output, named by tools/package/names.mjs:
 //   dist/stick-note_<version>_amd64.deb              Ubuntu, Debian, Linux Mint: double-click, Install
 //   dist/StickNote-<version>-linux-x64.AppImage      any other distribution
 //   dist/StickNote-<version>-linux-x64.tar.gz        no installation: extract and run ./stick-note
 //
-// Every package carries its own copy of the official Node.js runtime, so nothing else has to be
-// installed. Needs: GNU tar, xz, gzip and dpkg-deb (all present on Ubuntu and Debian).
+// Every package holds one program file: a statically linked build for x86_64-unknown-linux-musl, which needs nothing
+// from the system but the kernel, so it runs on any distribution. Needs: cargo with the musl target (rustup target add
+// x86_64-unknown-linux-musl), GNU tar, xz, gzip and dpkg-deb (all present on Ubuntu and Debian). --exe uses a program
+// that was built already, and --notices a THIRD-PARTY-NOTICES.txt that was made already (the WSL helper builds both
+// on Windows, where cargo is).
 //
 // Everything is assembled under the system temp folder, which must be a real Linux file system:
 // file modes and root ownership are only reliable there (not on a Windows drive seen from WSL).
@@ -22,9 +25,10 @@ import { assetNames } from './names.mjs';
 import {
   DIST_DIR, HOMEPAGE, PackagingError, ROOT, VERSION, applyModes, buildEpoch, capture, copyFile, copyrightLine, fail,
   formatBytes, listFiles, makeBuildInfo, makeTempDir, note, parseArgs, parseOnly, removeDir, renderTemplate, run, runMain,
-  stagePayload, step, thirdPartyNotices, totalSize, touchTree, trackTempDirs, which, writeFile, writeText,
+  step, totalSize, touchTree, trackTempDirs, which, writeFile, writeText,
 } from './lib.mjs';
-import { ensureAppImageTools, ensureRuntime } from './runtime.mjs';
+import { ensureAppImageTools } from './downloads.mjs';
+import { TRIPLES, buildProgram, checkProgramVersion, elfIsStatic, thirdPartyNotices } from './rust.mjs';
 
 const TARGETS = ['deb', 'appimage', 'tarball'];
 
@@ -40,11 +44,15 @@ const ICONS = [
 
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel));
 
-/** Copy the Node.js runtime to <dir>/runtime/node with its license next to it. */
-function placeRuntime(dir, runtime) {
-  fs.mkdirSync(path.join(dir, 'runtime'), { recursive: true });
-  copyFile(runtime.binary, path.join(dir, 'runtime', 'node'));
-  copyFile(runtime.license, path.join(dir, 'runtime', 'LICENSE-node.txt'));
+/**
+ * Put the program, its build-info.json and the notices into `dir`. The program looks for build-info.json next to
+ * itself (resolving symbolic links), which is how it learns its channel and where the notes live.
+ */
+function placeProgram(dir, { exe, channel, dataDir, notices }) {
+  fs.mkdirSync(dir, { recursive: true });
+  copyFile(exe, path.join(dir, 'stick-note'));
+  writeText(path.join(dir, 'build-info.json'), `${JSON.stringify(makeBuildInfo(channel, dataDir), null, 2)}\n`);
+  writeText(path.join(dir, 'THIRD-PARTY-NOTICES.txt'), notices);
 }
 
 /** A PNG's width is stored right after its signature; a mis-sized icon would silently look blurry. */
@@ -95,23 +103,23 @@ function debChangelog(maintainerLine, version) {
   return zlib.gzipSync(Buffer.from(body), { level: 9 }); // gzip -9n: no name or time stored
 }
 
-/** "<md5>  <path>" for every installed file, the format dpkg and debsums expect. */
+/** "<md5>  <path>" for every installed file, the format dpkg and debsums expect. Links are not files: they are left out. */
 function md5sums(root) {
   const line = (rel) => `${crypto.createHash('md5').update(fs.readFileSync(path.join(root, rel))).digest('hex')}  ${rel}`;
-  return `${listFiles(root).filter((rel) => !rel.startsWith('DEBIAN/')).map(line).join('\n')}\n`;
+  const regular = (rel) => !rel.startsWith('DEBIAN/') && !fs.lstatSync(path.join(root, rel)).isSymbolicLink();
+  return `${listFiles(root).filter(regular).map(line).join('\n')}\n`;
 }
 
-function buildDeb({ work, outDir, runtime }) {
+function buildDeb({ work, outDir, exe, notices }) {
   step('Debian package');
   const file = assetNames(VERSION).linuxDeb;
   const root = path.join(work, 'deb');
-  const install = path.join(root, 'opt', 'stick-note');
   const maintainerLine = maintainer();
 
-  placeRuntime(install, runtime);
-  stagePayload(path.join(install, 'app'), makeBuildInfo('linux-deb', 'user'));
-  writeText(path.join(install, 'THIRD-PARTY-NOTICES.txt'), thirdPartyNotices({ nodeVersion: runtime.version }));
-  writeText(path.join(root, 'usr', 'bin', 'stick-note'), renderTemplate('linux/stick-note'));
+  // The program lives in /usr/lib/stick-note (with its build-info.json); /usr/bin/stick-note is a link to it.
+  placeProgram(path.join(root, 'usr', 'lib', 'stick-note'), { exe, channel: 'linux-deb', dataDir: 'user', notices });
+  fs.mkdirSync(path.join(root, 'usr', 'bin'), { recursive: true });
+  fs.symlinkSync('../lib/stick-note/stick-note', path.join(root, 'usr', 'bin', 'stick-note'));
   writeText(path.join(root, 'usr', 'share', 'applications', 'stick-note.desktop'), renderTemplate('linux/stick-note.desktop'));
   placeIcons(root);
 
@@ -134,7 +142,7 @@ function buildDeb({ work, outDir, runtime }) {
   writeText(path.join(root, 'DEBIAN', 'prerm'), renderTemplate('linux/prerm'));
   writeText(path.join(root, 'DEBIAN', 'md5sums'), md5sums(root)); // lets "debsums" check the installed files
 
-  applyModes(root, ['opt/stick-note/runtime/node', 'usr/bin/stick-note', 'DEBIAN/prerm']);
+  applyModes(root, ['usr/lib/stick-note/stick-note', 'DEBIAN/prerm']);
   touchTree(root);
 
   const built = path.join(work, file);
@@ -144,22 +152,19 @@ function buildDeb({ work, outDir, runtime }) {
   note(`${file}  ${formatBytes(fs.statSync(built).size)}`);
 }
 
-async function buildAppImage({ work, outDir, runtime }) {
+async function buildAppImage({ work, outDir, exe, notices }) {
   step('AppImage');
   const file = assetNames(VERSION).linuxAppImage;
   const { tool, runtime: appImageRuntime } = await ensureAppImageTools();
 
   const appDir = path.join(work, 'AppDir');
-  const install = path.join(appDir, 'usr', 'lib', 'stick-note');
-  placeRuntime(install, runtime);
-  stagePayload(path.join(install, 'app'), makeBuildInfo('linux-appimage', 'user'));
-  writeText(path.join(install, 'THIRD-PARTY-NOTICES.txt'), thirdPartyNotices({ nodeVersion: runtime.version }));
+  placeProgram(path.join(appDir, 'usr', 'lib', 'stick-note'), { exe, channel: 'linux-appimage', dataDir: 'user', notices });
   writeText(path.join(appDir, 'AppRun'), renderTemplate('linux/AppRun'));
   writeText(path.join(appDir, 'stick-note.desktop'), renderTemplate('linux/stick-note.desktop'));
   fs.writeFileSync(path.join(appDir, 'stick-note.png'), read('tools/icon-src/icon-256.png'));
   fs.symlinkSync('stick-note.png', path.join(appDir, '.DirIcon'));
   placeIcons(appDir);
-  applyModes(appDir, ['AppRun', 'usr/lib/stick-note/runtime/node']);
+  applyModes(appDir, ['AppRun', 'usr/lib/stick-note/stick-note']);
   touchTree(appDir);
 
   // Run appimagetool from the temp folder (executable bit guaranteed) and without FUSE (not available in CI or containers).
@@ -180,18 +185,16 @@ async function buildAppImage({ work, outDir, runtime }) {
   note(`${file}  ${formatBytes(fs.statSync(built).size)}`);
 }
 
-async function buildTarball({ work, outDir, runtime }) {
+async function buildTarball({ work, outDir, exe, notices }) {
   step('tar.gz');
   const file = assetNames(VERSION).linuxTarball;
   const top = `stick-note-${VERSION}-linux-x64`;
   const dir = path.join(work, 'tarball', top);
 
-  placeRuntime(dir, runtime);
-  stagePayload(path.join(dir, 'app'), makeBuildInfo('linux-tarball', '../data'));
-  writeText(path.join(dir, 'stick-note'), renderTemplate('linux/stick-note-tarball'));
+  placeProgram(dir, { exe, channel: 'linux-tarball', dataDir: 'data', notices });
   writeText(path.join(dir, 'README.txt'), renderTemplate('linux/README-tarball.txt', { version: VERSION, homepage: HOMEPAGE }));
-  writeText(path.join(dir, 'THIRD-PARTY-NOTICES.txt'), thirdPartyNotices({ nodeVersion: runtime.version }));
-  applyModes(dir, ['stick-note', 'runtime/node']);
+  writeText(path.join(dir, 'LICENSE'), read('LICENSE').toString('utf8').replace(/\r\n/g, '\n'));
+  applyModes(dir, ['stick-note']);
   touchTree(path.dirname(dir));
 
   // Sorted names, numeric root ownership and one fixed time: the same input gives the same archive.
@@ -213,21 +216,28 @@ async function main() {
   if (process.platform !== 'linux') {
     throw new PackagingError('The Linux packages must be built on Linux. On Windows run: npm run package:linux:wsl (needs WSL with Ubuntu).');
   }
-  const args = parseArgs(process.argv.slice(2), { flags: ['keep'], options: ['only', 'out'] });
+  const args = parseArgs(process.argv.slice(2), { flags: ['keep'], options: ['only', 'out', 'exe', 'notices'] });
   const wanted = parseOnly(args.only, TARGETS);
   const outDir = path.resolve(args.out || DIST_DIR);
   requireTools(wanted);
   fs.mkdirSync(outDir, { recursive: true });
 
   console.log(`Stick Note ${VERSION}: building ${[...wanted].join(', ')} for Linux into ${outDir}`);
-  const cached = await ensureRuntime('linux-x64');
+  const built = args.exe ? path.resolve(args.exe) : buildProgram({ triple: TRIPLES.linux });
+  if (!fs.existsSync(built)) fail(`${built} does not exist`);
+  if (!elfIsStatic(built)) fail(`${built} is not statically linked, so it would not run on every distribution (build it for x86_64-unknown-linux-musl)`);
+  note('the program is statically linked');
   const work = makeTempDir('stick-note-linux-');
   try {
-    // The 120 MB binary is read from the cache once; each package then copies it from the temp folder.
-    const runtime = { ...cached, binary: path.join(work, 'node-source', 'node'), license: path.join(work, 'node-source', 'LICENSE') };
-    copyFile(cached.binary, runtime.binary);
-    copyFile(cached.license, runtime.license);
-    const context = { work, outDir, runtime };
+    // A copy on the Linux file system: the program may sit on a Windows drive (WSL), where the executable bit is not reliable.
+    const exe = path.join(work, 'program-source', 'stick-note');
+    copyFile(built, exe);
+    fs.chmodSync(exe, 0o755);
+    checkProgramVersion(exe);
+    // The notices are made from the crates the program was built from, which needs cargo. The WSL helper makes them
+    // on Windows (where cargo is) and hands the file over.
+    const notices = args.notices ? fs.readFileSync(path.resolve(args.notices), 'utf8') : thirdPartyNotices({ triple: TRIPLES.linux });
+    const context = { work, outDir, exe, notices };
     if (wanted.has('tarball')) await buildTarball(context);
     if (wanted.has('deb')) buildDeb(context);
     if (wanted.has('appimage')) await buildAppImage(context);
